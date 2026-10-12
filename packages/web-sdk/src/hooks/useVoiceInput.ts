@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { parseDictationServerEvent as parseServerEvent } from '@ottocode/api';
 import { apiClient } from '../lib/api-client';
 import { resolveDictationWebSocketUrl } from '../lib/api-client/dictation';
 import { disposeVoiceSessionResources } from '../lib/voice-session-resources';
@@ -6,30 +7,6 @@ import { disposeVoiceSessionResources } from '../lib/voice-session-resources';
 const TARGET_SAMPLE_RATE = 16000;
 const PCM_FRAME_BYTES = 3200; // 100ms of 16 kHz mono pcm_s16le
 const PROCESSOR_BUFFER_SIZE = 4096;
-
-type DictationServerEvent =
-	| {
-			type: 'ready';
-			sessionId: string;
-			model: string;
-	  }
-	| {
-			type: 'recording';
-			receivedMs: number;
-			receivedBytes: number;
-	  }
-	| {
-			type: 'final';
-			text: string;
-			language: string;
-			model: string;
-			durationMs: number;
-	  }
-	| {
-			type: 'error';
-			code: string;
-			message: string;
-	  };
 
 interface UseVoiceInputOptions {
 	/** Called when daemon dictation returns transcript text. */
@@ -65,16 +42,6 @@ function getAudioContextConstructor(): typeof AudioContext | null {
 
 function toLanguageCode(lang: string): string {
 	return lang.split('-', 1)[0]?.toLowerCase() || 'en';
-}
-
-function parseServerEvent(raw: string): DictationServerEvent | null {
-	try {
-		const value = JSON.parse(raw) as DictationServerEvent;
-		if (!value || typeof value.type !== 'string') return null;
-		return value;
-	} catch {
-		return null;
-	}
 }
 
 function resampleLinear(

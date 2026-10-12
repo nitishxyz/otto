@@ -36,6 +36,10 @@ export type {
 } from '../../types/src/provider-descriptors.ts';
 export { createBuiltInProviderModel } from './model-factory.ts';
 export type { BuiltInModelFactoryConfig } from './model-factory.ts';
+export { createProviderModel } from './dispatch.ts';
+export type { ProviderModelConfig } from './dispatch.ts';
+export { createConfiguredProviderModel } from './configured-model.ts';
+export type { ConfiguredProviderModelConfig } from './configured-model.ts';
 export {
 	getModelFromMap,
 	hasModelInMap,
@@ -178,8 +182,15 @@ export { createKimiModel, readKimiApiKeyFromEnv } from './kimi-client.ts';
 export type { KimiProviderConfig } from './kimi-client.ts';
 export { createMinimaxModel } from './minimax-client.ts';
 export type { MinimaxProviderConfig } from './minimax-client.ts';
-export { createCopilotFetch, createCopilotModel } from './copilot-client.ts';
-export type { CopilotOAuthConfig } from './copilot-client.ts';
+export {
+	createCopilotFetch,
+	createCopilotModel,
+	getCopilotTransport,
+} from './copilot-client.ts';
+export type {
+	CopilotOAuthConfig,
+	CopilotTransport,
+} from './copilot-client.ts';
 export {
 	DEFAULT_PROVIDER_REQUEST_MAX_RETRIES,
 	DEFAULT_PROVIDER_REQUEST_RETRY_DELAY_MS,

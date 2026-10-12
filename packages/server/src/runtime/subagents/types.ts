@@ -53,6 +53,7 @@ export type MessageSubagentResult =
 
 export type StopSubagentInput = {
 	db: DB;
+	projectRoot?: string;
 	parentSessionId: string;
 	subagentId: string;
 };

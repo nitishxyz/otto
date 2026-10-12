@@ -184,7 +184,10 @@ export async function loadInstructionFiles(
 		} catch {}
 	}
 
-	return contents.join('\n');
+	return [
+		'Instruction precedence: project instructions override global instructions on conflicts. For project files, AGENTS.md takes precedence over CLAUDE.md, then CONTEXT.md; the nearest ancestor copy of each file is used. GUIDED.md applies only in guided mode.',
+		...contents,
+	].join('\n');
 }
 
 export async function composeEnvironmentAndInstructions(

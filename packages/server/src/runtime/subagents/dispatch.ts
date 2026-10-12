@@ -13,6 +13,7 @@ export async function dispatchSubagentMessage(args: {
 	messageOrigin: 'parent-agent' | 'agent-results' | 'system';
 	memoryTask?: string;
 	context?: DispatchOptions['context'];
+	acceptClaim?: DispatchOptions['acceptClaim'];
 }) {
 	const { dispatchAssistantMessage } = await import('../message/service.ts');
 	return dispatchAssistantMessage({
@@ -26,5 +27,6 @@ export async function dispatchSubagentMessage(args: {
 		messageOrigin: args.messageOrigin,
 		memoryTask: args.memoryTask,
 		context: args.context,
+		acceptClaim: args.acceptClaim,
 	});
 }

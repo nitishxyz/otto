@@ -1,12 +1,37 @@
 import { wrapLanguageModel } from 'ai';
 import { devToolsMiddleware } from '@ai-sdk/devtools';
 import type { OttoConfig } from '@ottocode/sdk';
+import { getCopilotTransport } from '@ottocode/sdk/providers';
 import { isDevtoolsEnabled } from '../../debug/state.ts';
 import { resolveModel } from '../../provider/index.ts';
 import { buildReasoningConfig } from '../../provider/reasoning.ts';
 import type { RunOpts } from '../../session/queue.ts';
 import { mergeProviderOptions } from './runner-setup-tools.ts';
 import { nowMs } from './runner-setup-utils.ts';
+
+export type RunnerModelTransport =
+	| 'default'
+	| 'copilot-responses'
+	| 'copilot-chat';
+
+export type RunnerModelCapabilities = {
+	transport: RunnerModelTransport;
+};
+
+/** Transport/capability decision for a resolved model, made in one place. */
+export function resolveRunnerModelCapabilities(
+	opts: Pick<RunOpts, 'provider' | 'model'>,
+): RunnerModelCapabilities {
+	if (opts.provider === 'copilot') {
+		return {
+			transport:
+				getCopilotTransport(opts.model) === 'responses'
+					? 'copilot-responses'
+					: 'copilot-chat',
+		};
+	}
+	return { transport: 'default' };
+}
 
 export async function resolveRunnerModel(args: {
 	opts: RunOpts;
@@ -16,6 +41,7 @@ export async function resolveRunnerModel(args: {
 		| Awaited<ReturnType<typeof resolveModel>>
 		| ReturnType<typeof wrapLanguageModel>;
 	resolveModelMs: number;
+	capabilities: RunnerModelCapabilities;
 }> {
 	const resolveModelStartedAt = nowMs();
 	const model = await resolveModel(
@@ -26,6 +52,7 @@ export async function resolveRunnerModel(args: {
 			sessionId: args.opts.sessionId,
 			messageId: args.opts.assistantMessageId,
 			reasoningText: args.opts.reasoningText,
+			abortSignal: args.opts.abortSignal,
 		},
 	);
 	const resolveModelMs = nowMs() - resolveModelStartedAt;
@@ -37,7 +64,11 @@ export async function resolveRunnerModel(args: {
 			})
 		: model;
 
-	return { model: wrappedModel, resolveModelMs };
+	return {
+		model: wrappedModel,
+		resolveModelMs,
+		capabilities: resolveRunnerModelCapabilities(args.opts),
+	};
 }
 
 export function buildRunnerProviderOptions(args: {

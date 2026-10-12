@@ -1,5 +1,6 @@
 import {
 	createSSEStream,
+	decodeSSEEvent,
 	listMessagePage,
 	listPendingSecureInputs,
 } from '@ottocode/api';
@@ -182,16 +183,20 @@ export async function connectSSE(
 	await createSSEStream(
 		{
 			baseUrl: parsedUrl.origin,
-			sessionId: parsedUrl.pathname.split('/').at(-2) ?? '',
+			sessionId: decodeURIComponent(parsedUrl.pathname.split('/').at(-2) ?? ''),
 			projectId: parsedUrl.searchParams.get('projectId') ?? undefined,
 			projectPath: parsedUrl.searchParams.get('project') ?? undefined,
 			onEvent: (event) => {
-				try {
+				const parsed = decodeSSEEvent(
+					event,
+					decodeURIComponent(parsedUrl.pathname.split('/').at(-2) ?? ''),
+				);
+				if (parsed) {
 					onEvent({
-						type: event.event ?? 'message',
-						payload: JSON.parse(event.data),
+						type: parsed.type,
+						payload: parsed.payload,
 					});
-				} catch {}
+				}
 			},
 		},
 		signal,

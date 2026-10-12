@@ -15,6 +15,7 @@ import {
 	loadMachineDevices,
 } from './lib/machine-api';
 import { ensureDesktopDaemonReady } from './lib/daemon-startup';
+import { restoreNotificationProject } from './lib/notification-restore';
 import { configureDesktopSdk, configureMachineSdk } from './lib/sdk-client';
 import { router } from './router';
 import { useNativeDesktopTheme } from './theme';
@@ -51,8 +52,9 @@ function App() {
 		void startupAttempt;
 		const init = async () => {
 			setDaemonError(null);
+			let daemonInfo: ServerInfo;
 			try {
-				const daemonInfo = await ensureDesktopDaemonReady(() =>
+				daemonInfo = await ensureDesktopDaemonReady(() =>
 					tauriBridge.ensureDesktopDaemon(),
 				);
 				configureDesktopSdk(daemonInfo.url, daemonInfo);
@@ -69,11 +71,15 @@ function App() {
 				.getCliSelection()
 				.then(setCliSelection)
 				.catch(() => {});
-			let [machineBootstrap, initialPath, initialRemote] = await Promise.all([
-				tauriBridge.getMachineBootstrap(),
-				tauriBridge.getInitialProject(),
-				tauriBridge.getInitialRemote(),
-			]);
+			let [machineBootstrap, initialPath, initialRemote, initialNotification] =
+				await Promise.all([
+					tauriBridge.getMachineBootstrap(),
+					tauriBridge.getInitialProject(),
+					tauriBridge.getInitialRemote(),
+					tauriBridge.getInitialNotification(),
+				]);
+			if (initialNotification)
+				machineBootstrap = initialNotification.machine ?? null;
 			if (machineBootstrap) {
 				try {
 					const { devices } = await loadMachineDevices();
@@ -110,7 +116,41 @@ function App() {
 
 			let nextProject: Project | null = null;
 
-			if (nextRoute !== '/onboarding' && initialRemote) {
+			if (initialNotification) {
+				try {
+					nextProject = await restoreNotificationProject(
+						initialNotification,
+						machineBootstrap,
+						daemonInfo.url,
+						loadAuthorizedMachineProjects,
+					);
+				} catch (error) {
+					setDaemonError(
+						error instanceof Error
+							? error.message
+							: 'Notification project unavailable.',
+					);
+					return;
+				}
+				if (
+					initialNotification.machine &&
+					nextProject.remoteUrl &&
+					nextProject.projectId &&
+					nextProject.machineOwnerSession &&
+					nextProject.machineOwnerSessionExpiresAt
+				) {
+					configureMachineSdk(
+						nextProject.remoteUrl,
+						nextProject.projectId,
+						nextProject.path,
+						nextProject.machineOwnerSession,
+						nextProject.machineOwnerSessionExpiresAt,
+						daemonInfo.url,
+						daemonInfo.token,
+					);
+				}
+				nextRoute = '/sessions';
+			} else if (nextRoute !== '/onboarding' && initialRemote) {
 				const [remoteUrl, remoteName] = initialRemote;
 				nextProject = {
 					path: remoteName,
@@ -138,7 +178,15 @@ function App() {
 				setSelectedProject(nextProject);
 				setInitialized(true);
 			});
-			await router.navigate({ to: nextRoute, replace: true });
+			if (initialNotification?.sessionId) {
+				await router.navigate({
+					to: '/sessions/$sessionId',
+					params: { sessionId: initialNotification.sessionId },
+					replace: true,
+				});
+			} else {
+				await router.navigate({ to: nextRoute, replace: true });
+			}
 		};
 
 		init();

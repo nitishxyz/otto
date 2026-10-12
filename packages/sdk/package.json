@@ -25,6 +25,13 @@
 			"import": "./src/browser.ts",
 			"types": "./src/browser.ts"
 		},
+		"./config": "./src/config/src/index.ts",
+		"./auth": "./src/auth/src/index.ts",
+		"./providers": "./src/providers/src/index.ts",
+		"./tools": "./src/core/src/tools/loader.ts",
+		"./skills": "./src/skills/index.ts",
+		"./judge": "./src/judge/index.ts",
+		"./tunnel": "./src/tunnel/index.ts",
 		"./memory": {
 			"import": "./src/memory/index.ts",
 			"types": "./src/memory/index.ts"
@@ -156,6 +163,7 @@
 		"@modelcontextprotocol/sdk": "1.27.1",
 		"@openauthjs/openauth": "0.4.3",
 		"@openrouter/ai-sdk-provider": "1.5.4",
+		"@ottocode/database": "workspace:*",
 		"@ottorouter/ai-sdk": "workspace:*",
 		"@solana/web3.js": "1.98.4",
 		"ai": "6.0.199",

@@ -2,8 +2,7 @@ import type { ProviderId } from '../../types/src/provider.ts';
 import { catalog } from './catalog-merged.ts';
 import { isBuiltInProviderId } from './registry.ts';
 
-export const CACHE_USAGE_NORMALIZATION_MARKER =
-	'cache_usage_normalization_v2_enabled';
+export { CACHE_USAGE_NORMALIZATION_MARKER } from '@ottocode/database/markers';
 
 /** Resolves router models to the provider usage contract used by AI SDK. */
 export function resolveUsageProvider(

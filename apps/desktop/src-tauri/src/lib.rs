@@ -170,6 +170,11 @@ pub fn run() {
 
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                commands::notification::forget_notification_window(window.label());
+            }
+        })
         .on_menu_event(|app, event| {
             if event.id().as_ref() == "new_window" {
                 let handle = app.clone();
@@ -229,6 +234,8 @@ pub fn run() {
             commands::machine::set_current_machine,
             commands::machine::set_machine_window_project,
             commands::notification::show_native_notification,
+            commands::notification::set_notification_window_context,
+            commands::notification::get_initial_notification,
             get_initial_project,
             get_initial_remote,
             get_platform,

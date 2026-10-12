@@ -51,6 +51,7 @@ async function insertSubagent(args: {
 		status: args.status,
 		summary: args.summary,
 		reported: false,
+		deliveryState: args.status === 'running' ? 'none' : 'pending',
 		createdAt: args.createdAt,
 		updatedAt: args.createdAt,
 	});
@@ -142,6 +143,9 @@ describe('withSubagentResultsPrepareStep', () => {
 			.from(subagents)
 			.where(eq(subagents.parentSessionId, PARENT_SESSION_ID));
 		expect(records.every((record) => record.reported)).toBe(true);
+		expect(
+			records.every((record) => record.deliveryState === 'delivered'),
+		).toBe(true);
 
 		const laterMessages: ModelMessage[] = [
 			...baseMessages,

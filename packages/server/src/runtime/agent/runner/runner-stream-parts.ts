@@ -18,6 +18,7 @@ import {
 import { handleRunnerTextDelta, type RunnerTextState } from './runner-text.ts';
 import type { RunnerToolObserverState } from './runner-tool-observer.ts';
 import { nowMs } from './runner-telemetry.ts';
+import { findToolResultDurabilityError } from '../turn/durability.ts';
 
 type TurnDumpCollector = NonNullable<
 	ReturnType<typeof createTurnDumpCollector>
@@ -92,6 +93,8 @@ export async function consumeRunnerStreamParts(args: {
 	queueWaitMs: number;
 	setupMs: number;
 	dump: TurnDumpCollector | null;
+	/** Receives SDK `error` chunks; the turn executor decides the outcome. */
+	onStreamError?: (error: unknown) => void;
 }) {
 	let firstFullStreamPartSeen = false;
 	const iterator = args.fullStream[Symbol.asyncIterator]();
@@ -111,6 +114,12 @@ export async function consumeRunnerStreamParts(args: {
 		const rawPart = next.value;
 		const part = asStreamPartRecord(rawPart);
 		if (!part) continue;
+		const durabilityError = findToolResultDurabilityError(part);
+		if (durabilityError !== undefined) {
+			args.onStreamError?.(durabilityError);
+			cancelIterator(iterator);
+			throw durabilityError;
+		}
 
 		if (!firstFullStreamPartSeen) {
 			firstFullStreamPartSeen = true;
@@ -198,8 +207,21 @@ export async function consumeRunnerStreamParts(args: {
 			case 'reasoning-end': {
 				const reasoningId = stringField(part, 'id');
 				if (!reasoningId) break;
-				await handleReasoningEnd(reasoningId, args.db, args.reasoningStates);
+				await handleReasoningEnd(
+					reasoningId,
+					args.db,
+					args.reasoningStates,
+					part.providerMetadata,
+				);
 				break;
+			}
+			case 'error': {
+				const streamError = part.error ?? part;
+				if (args.onStreamError) {
+					args.onStreamError(streamError);
+					break;
+				}
+				throw streamError;
 			}
 		}
 	}

@@ -27,6 +27,24 @@ import mig0009 from '../../drizzle/0009_tearful_roland_deschain.sql' with {
 import mig0010 from '../../drizzle/0010_aberrant_hellion.sql' with {
 	type: 'text',
 };
+import mig0011 from '../../drizzle/0011_dedupe_message_part_index.sql' with {
+	type: 'text',
+};
+import mig0012 from '../../drizzle/0012_message_sequence_and_checkpoint_boundary.sql' with {
+	type: 'text',
+};
+import mig0013 from '../../drizzle/0013_backfill_message_sequence.sql' with {
+	type: 'text',
+};
+import mig0014 from '../../drizzle/0014_dedupe_running_subagents.sql' with {
+	type: 'text',
+};
+import mig0015 from '../../drizzle/0015_subagent_attempt_delivery.sql' with {
+	type: 'text',
+};
+import mig0016 from '../../drizzle/0016_backfill_subagent_delivery_state.sql' with {
+	type: 'text',
+};
 
 export const bundledMigrations: Array<{ name: string; content: string }> = [
 	{ name: '0000_material_swarm.sql', content: mig0000 },
@@ -40,4 +58,13 @@ export const bundledMigrations: Array<{ name: string; content: string }> = [
 	{ name: '0008_quick_screwball.sql', content: mig0008 },
 	{ name: '0009_tearful_roland_deschain.sql', content: mig0009 },
 	{ name: '0010_aberrant_hellion.sql', content: mig0010 },
+	{ name: '0011_dedupe_message_part_index.sql', content: mig0011 },
+	{
+		name: '0012_message_sequence_and_checkpoint_boundary.sql',
+		content: mig0012,
+	},
+	{ name: '0013_backfill_message_sequence.sql', content: mig0013 },
+	{ name: '0014_dedupe_running_subagents.sql', content: mig0014 },
+	{ name: '0015_subagent_attempt_delivery.sql', content: mig0015 },
+	{ name: '0016_backfill_subagent_delivery_state.sql', content: mig0016 },
 ];

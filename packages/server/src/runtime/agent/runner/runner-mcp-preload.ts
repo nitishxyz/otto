@@ -8,6 +8,7 @@ import {
 	type OttoConfig,
 } from '@ottocode/sdk';
 import type { RunOpts } from '../../session/queue.ts';
+import { withAbortFallback } from '../turn/abort.ts';
 
 /** Hard cap so a slow judge can never delay the first model call noticeably. */
 const PRELOAD_TIMEOUT_MS = 1_500;
@@ -34,7 +35,7 @@ export function startMCPPreload(args: {
 	const userMessage = opts.userContent?.trim() ?? '';
 	if (!userMessage) return { result: Promise.resolve(null) };
 
-	const result = (async (): Promise<MCPPreloadResult | null> => {
+	const pending = (async (): Promise<MCPPreloadResult | null> => {
 		try {
 			const config = await resolveJudgeConfig(cfg.judge, cfg.projectRoot);
 			if (!config.mcp.preloadTools) return null;
@@ -67,5 +68,7 @@ export function startMCPPreload(args: {
 		}
 	})();
 
-	return { result };
+	return {
+		result: withAbortFallback(pending, opts.abortSignal, null),
+	};
 }

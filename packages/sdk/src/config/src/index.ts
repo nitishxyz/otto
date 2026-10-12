@@ -1,3 +1,4 @@
+import { setDatabasePathResolver } from '@ottocode/database';
 import {
 	getProjectConfigDir,
 	getProjectConfigPath,
@@ -17,6 +18,16 @@ import {
 } from '../../runtime/json-object-file.ts';
 
 export type { OttoConfig } from '../../types/src/index.ts';
+
+/** Resolves database storage using the same migration/path policy as loadConfig. */
+export async function resolveDatabasePath(
+	projectRootInput?: string,
+): Promise<string> {
+	return (await loadConfig(projectRootInput)).paths.dbPath;
+}
+
+// The config owner explicitly initializes the lower-layer compatibility accessor.
+setDatabasePathResolver(resolveDatabasePath);
 
 const DEFAULT_PROVIDER_SETTINGS: OttoConfig['providers'] = Object.fromEntries(
 	Object.values(BUILT_IN_PROVIDER_DESCRIPTORS).map((descriptor) => [
@@ -131,6 +142,8 @@ async function loadResolvedConfig(
 		references: merged.references as OttoConfig['references'],
 		judge: merged.judge as OttoConfig['judge'],
 		memory: merged.memory as OttoConfig['memory'],
+		debugEnabled: merged.debugEnabled as OttoConfig['debugEnabled'],
+		debugScopes: merged.debugScopes as OttoConfig['debugScopes'],
 		paths: {
 			projectConfigDir,
 			projectConfigPath: (await fileExists(projectConfigPath))

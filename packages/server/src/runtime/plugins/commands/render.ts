@@ -7,6 +7,8 @@ import type {
 } from './types.ts';
 
 const PLACEHOLDER_PATTERN = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
+/** Non-global variant for presence checks (global regexes keep lastIndex). */
+const HAS_PLACEHOLDER_PATTERN = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/;
 
 function isPathInsidePluginDir(
 	pluginDir: string,
@@ -53,7 +55,7 @@ function renderPluginCommandSpec(
 ):
 	| { ok: true; value: RenderedPluginCommandSpec }
 	| { ok: false; error: string } {
-	if (PLACEHOLDER_PATTERN.test(definition.command)) {
+	if (HAS_PLACEHOLDER_PATTERN.test(definition.command)) {
 		return {
 			ok: false,
 			error: 'Plugin command executable cannot use template placeholders',

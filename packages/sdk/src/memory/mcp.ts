@@ -169,7 +169,7 @@ export async function serveMemoryMCP(projectRoot: string): Promise<void> {
 		'forget_memory',
 		{
 			description:
-				'Permanently forget an accessible memory and all its revisions.',
+				'Permanently delete this accessible memory node and its incident links. Other revisions remain.',
 			inputSchema: { id: z.string().uuid() },
 		},
 		async ({ id }) => {

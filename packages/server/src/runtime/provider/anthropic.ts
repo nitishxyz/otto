@@ -1,31 +1,19 @@
 import type { OttoConfig } from '@ottocode/sdk';
-import {
-	getAuth,
-	createAnthropicOAuthModel,
-	createAnthropicCachingFetch,
-} from '@ottocode/sdk';
-import { createAnthropic } from '@ai-sdk/anthropic';
+import { createProviderModel } from '@ottocode/sdk/providers';
 import { toClaudeCodeName } from '../tools/mapping.ts';
 import { providerFetch } from './fetch.ts';
+import { getRunProviderAuth } from './credentials.ts';
 
 export async function getAnthropicInstance(cfg: OttoConfig) {
-	const auth = await getAuth('anthropic', cfg.projectRoot);
-
-	if (auth?.type === 'oauth') {
-		return (model: string) =>
-			createAnthropicOAuthModel(model, {
-				oauth: {
-					access: auth.access,
-					refresh: auth.refresh,
-					expires: auth.expires,
-				},
-				projectRoot: cfg.projectRoot,
-				toolNameTransformer: toClaudeCodeName,
-			});
-	}
-
-	const cachingFetch = createAnthropicCachingFetch(providerFetch);
-	return createAnthropic({
-		fetch: cachingFetch as typeof fetch,
-	});
+	const auth = await getRunProviderAuth('anthropic', cfg.projectRoot);
+	return (model: string) =>
+		createProviderModel('anthropic', model, {
+			apiKey: auth?.type === 'api' ? auth.key : undefined,
+			oauth: auth?.type === 'oauth' ? auth : undefined,
+			authMode: 'managed',
+			projectRoot: cfg.projectRoot,
+			toolNameTransformer: toClaudeCodeName,
+			baseURL: cfg.providers?.anthropic?.baseURL,
+			customFetch: providerFetch,
+		});
 }

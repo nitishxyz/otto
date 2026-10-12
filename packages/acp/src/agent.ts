@@ -28,7 +28,7 @@ import type {
 } from '@agentclientprotocol/sdk';
 import { handleAskRequest } from '@ottocode/server/runtime/ask/service';
 import { resolveAgentConfig } from '@ottocode/server/runtime/agent-registry';
-import { subscribe } from '@ottocode/server/events/bus';
+import { subscribeScopedSessionEvents } from '@ottocode/server/events/bus';
 import {
 	abortMessage,
 	getRunnerState,
@@ -47,6 +47,7 @@ import {
 	type ShellExecutor,
 } from '@ottocode/sdk';
 import { randomUUID } from 'node:crypto';
+import { realpath } from 'node:fs/promises';
 import { queueAvailableCommands } from './available-commands';
 import { parseModelId } from './model';
 import { handleOttoEvent } from './events';
@@ -59,6 +60,7 @@ import {
 	handleStageCommand,
 } from './slash-commands';
 import { ensureAcpServer } from './server';
+import { serializeSessionUpdates } from './connection';
 import { ACP_VERSION, DEFAULT_MODE, type AcpSession } from './types';
 
 export class OttoAcpAgent implements Agent {
@@ -67,7 +69,7 @@ export class OttoAcpAgent implements Agent {
 	private clientCapabilities?: ClientCapabilities;
 
 	constructor(client: AgentSideConnection) {
-		this.client = client;
+		this.client = serializeSessionUpdates(client);
 	}
 
 	async initialize(request: InitializeRequest): Promise<InitializeResponse> {
@@ -109,7 +111,10 @@ export class OttoAcpAgent implements Agent {
 	}
 
 	async newSession(params: NewSessionRequest): Promise<NewSessionResponse> {
-		const cwd = params.cwd || process.cwd();
+		await ensureAcpServer();
+		const cwd = await realpath(
+			(await loadConfig(params.cwd || process.cwd())).projectRoot,
+		);
 		const defaults = await loadSessionDefaults(cwd);
 		let sessionId: string = randomUUID();
 		let ottoSessionId = '';
@@ -405,17 +410,21 @@ export class OttoAcpAgent implements Agent {
 		let unsub: (() => void) | null = null;
 		const subscribeToPromptEvents = (ottoSessionId: string) => {
 			if (unsub) return;
-			unsub = subscribe(ottoSessionId, (event) => {
-				if (event.type === 'session.updated') return;
-				const currentSession = this.sessions.get(params.sessionId);
-				if (!currentSession) return;
-				void handleOttoEvent(
-					this.client,
-					event,
-					params.sessionId,
-					currentSession,
-				);
-			});
+			unsub = subscribeScopedSessionEvents(
+				ottoSessionId,
+				(event) => {
+					if (event.type === 'session.updated') return;
+					const currentSession = this.sessions.get(params.sessionId);
+					if (!currentSession) return;
+					void handleOttoEvent(
+						this.client,
+						event,
+						params.sessionId,
+						currentSession,
+					);
+				},
+				session.cwd,
+			);
 			session.unsubscribe = unsub;
 		};
 
@@ -526,7 +535,9 @@ export class OttoAcpAgent implements Agent {
 		const session: AcpSession = {
 			sessionId,
 			ottoSessionId: sessionId,
-			cwd: row.projectPath || cwd,
+			cwd: await realpath(
+				(await loadConfig(row.projectPath || cwd)).projectRoot,
+			),
 			cancelled: false,
 			assistantMessageId: null,
 			resolvePrompt: null,
@@ -554,7 +565,7 @@ export class OttoAcpAgent implements Agent {
 	) {
 		if (!session.ottoSessionId || session.sessionInfoUnsubscribe) return;
 
-		session.sessionInfoUnsubscribe = subscribe(
+		session.sessionInfoUnsubscribe = subscribeScopedSessionEvents(
 			session.ottoSessionId,
 			(event) => {
 				if (event.type !== 'session.updated') return;
@@ -562,6 +573,7 @@ export class OttoAcpAgent implements Agent {
 				if (!currentSession) return;
 				void handleOttoEvent(this.client, event, acpSessionId, currentSession);
 			},
+			session.cwd,
 		);
 	}
 

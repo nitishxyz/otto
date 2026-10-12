@@ -30,6 +30,14 @@ CLI selection is conservative: desktop checks the embedded CLI and a local insta
 
 When the CLI detects the desktop app is installed, running `otto` with no arguments opens the desktop app instead of the browser.
 
+### Notification activation (macOS)
+
+Session notification clicks target one window, scoped by server URL, project ID, and workspace path. The window currently showing that session wins; other windows ignore the activation before focusing or navigating. Notification deduplication uses the same workspace scope so identical IDs on different remote servers remain independent.
+
+If the original window closes or changes projects, another window in the same workspace is reused. If that workspace is no longer open, the normal new-window builder restores the notification's project and session in a fresh window, preserving machine bootstrap when available. Unrelated windows remain unchanged.
+
+Listeners are installed before window availability is published, and registration/cleanup are serialized across workspace changes. Activation rechecks its workspace generation after asynchronous window operations and query refreshes. Machine fallback snapshots retain only routing metadata, not owner-session credentials; a fresh owner session is acquired through the local daemon's authorized-machine API before opening the captured project.
+
 ### Native terminal
 
 The desktop terminal uses the cross-platform `libghostty-vt` Rust bindings for VT parsing, render state, keyboard encoding, scrollback, and terminal-generated responses. A parented, non-focusable `wgpu` surface renders with Metal on macOS, Vulkan/GLES on Linux, and DirectX 12 on Windows. The web app continues to use `ghostty-web`, and Desktop retains a Canvas fallback when no compatible GPU adapter is available.

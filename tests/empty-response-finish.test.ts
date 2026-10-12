@@ -6,6 +6,8 @@ import { getDb } from '@ottocode/database';
 import { messageParts, messages, sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import { markEmptyResponseAfterFinalAttempt } from '../packages/server/src/runtime/agent/runner/runner-empty-response.ts';
+import { completePendingAssistantMessage } from '../packages/server/src/runtime/agent/turn/terminal.ts';
+import { publishAssistantMessageError } from '../packages/server/src/runtime/errors/assistant-message-error.ts';
 import type { RunOpts } from '../packages/server/src/runtime/session/queue.ts';
 
 let projectRoot = '';
@@ -43,7 +45,7 @@ async function insertPendingAssistantRun(sessionId: string, messageId: string) {
 }
 
 describe('runner empty assistant response guard', () => {
-	test('converts a successful finish with no assistant parts into an error part', async () => {
+	test('marks a pending empty finish as error before assistant completion', async () => {
 		const sessionId = 'empty-response-session';
 		const messageId = 'empty-response-message';
 		const db = await insertPendingAssistantRun(sessionId, messageId);
@@ -55,15 +57,6 @@ describe('runner empty assistant response guard', () => {
 			model: 'zai-org/GLM-5.2:together',
 			projectRoot,
 		};
-		await db
-			.update(messages)
-			.set({
-				status: 'complete',
-				completedAt: Date.now(),
-				finishReason: 'other',
-			})
-			.where(eq(messages.id, messageId));
-
 		const marked = await markEmptyResponseAfterFinalAttempt({
 			opts,
 			db,
@@ -102,6 +95,62 @@ describe('runner empty assistant response guard', () => {
 			provider: 'huggingface',
 			model: 'zai-org/GLM-5.2:together',
 		});
+		expect(
+			await completePendingAssistantMessage({
+				db,
+				opts,
+				fin: { finishReason: 'other' },
+			}),
+		).toBe(false);
+	});
+
+	test('does not persist a late empty-response error over a completed outcome', async () => {
+		const sessionId = 'completed-response-session';
+		const messageId = 'completed-response-message';
+		const db = await insertPendingAssistantRun(sessionId, messageId);
+		const opts: RunOpts = {
+			sessionId,
+			assistantMessageId: messageId,
+			agent: 'build',
+			provider: 'huggingface',
+			model: 'zai-org/GLM-5.2:together',
+			projectRoot,
+		};
+		expect(
+			await completePendingAssistantMessage({
+				db,
+				opts,
+				fin: { finishReason: 'stop' },
+			}),
+		).toBe(true);
+		const [completedMessage] = await db
+			.select()
+			.from(messages)
+			.where(eq(messages.id, messageId))
+			.limit(1);
+
+		const result = await publishAssistantMessageError({
+			db,
+			opts,
+			error: {
+				message: 'Assistant response finished without returning any content.',
+				type: 'empty_response',
+			},
+		});
+
+		const [message] = await db
+			.select()
+			.from(messages)
+			.where(eq(messages.id, messageId))
+			.limit(1);
+		const parts = await db
+			.select()
+			.from(messageParts)
+			.where(eq(messageParts.messageId, messageId));
+		expect(result.persisted).toBe(false);
+		expect(message.status).toBe('complete');
+		expect(message).toEqual(completedMessage);
+		expect(parts).toEqual([]);
 	});
 
 	test('does not mark tool-only runs as empty while retry/continuation can recover', async () => {

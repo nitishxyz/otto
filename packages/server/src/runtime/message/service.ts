@@ -4,9 +4,12 @@ import { runSessionLoop } from '../agent/runner.ts';
 import { enqueueAssistantRun } from '../session/queue.ts';
 import { attachDirectImages } from './attachments.ts';
 import { estimateTokens } from './compaction.ts';
-import { createPendingAssistantMessage, createUserMessage } from './create.ts';
-import { injectMessageContext, prepareMessageContext } from './context.ts';
-import { resolveFileMentionReferences } from './file-mentions.ts';
+import { acceptUserTurn } from './create.ts';
+import { prepareMessageContext } from './context.ts';
+import {
+	preprocessFileMentionsForModel,
+	resolveFileMentionReferences,
+} from './file-mentions.ts';
 import {
 	compressFileImageAttachments,
 	compressImageAttachments,
@@ -35,6 +38,7 @@ export async function dispatchAssistantMessage(
 		images,
 		files,
 		context,
+		acceptClaim,
 	} = options;
 
 	const sessionId = session.id;
@@ -75,6 +79,12 @@ export async function dispatchAssistantMessage(
 			? [read.input.path]
 			: [],
 	);
+	// Snapshot mentioned files now so history projection never rereads them.
+	const mentionSnapshot = await preprocessFileMentionsForModel({
+		text: content,
+		projectRoot: cfg.projectRoot,
+		preloadedPaths: preloadedFileMentions,
+	});
 	logger.debug('[agent] dispatching assistant message', {
 		sessionId,
 		agent: effectiveAgent,
@@ -85,7 +95,7 @@ export async function dispatchAssistantMessage(
 		builtinCommand: builtinCommand?.id,
 	});
 
-	await createUserMessage({
+	const { assistantMessageId, contextTokens } = await acceptUserTurn({
 		db,
 		sessionId,
 		agent: effectiveAgent,
@@ -95,25 +105,11 @@ export async function dispatchAssistantMessage(
 		messageOrigin,
 		createdAt: now,
 		preloadedFileMentions,
+		mentionSnapshotText: mentionSnapshot.text,
 		images: imagesWithAttachments,
 		files: compressedFiles,
-	});
-
-	const { assistantMessageId } = await createPendingAssistantMessage({
-		db,
-		sessionId,
-		agent: effectiveAgent,
-		provider: effectiveProvider,
-		model: effectiveModel,
-	});
-	const contextTokens = await injectMessageContext({
-		db,
-		sessionId,
-		messageId: assistantMessageId,
-		agent: effectiveAgent,
-		provider: effectiveProvider,
-		model: effectiveModel,
-		prepared: preparedContext,
+		context: preparedContext,
+		claim: acceptClaim,
 	});
 
 	const commandPromptText =
@@ -148,6 +144,7 @@ export async function dispatchAssistantMessage(
 			omitHistory: builtinCommand?.omitHistory,
 			isCompactCommand: builtinCommand?.isCompactCommand,
 			compactionContext: builtinCommand?.compactionContext,
+			compactionThroughMessageId: builtinCommand?.compactionThroughMessageId,
 			additionalPromptMessages: builtinCommand?.additionalPromptMessages,
 			toolApprovalMode,
 		},

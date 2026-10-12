@@ -1,4 +1,4 @@
-import { resolveEffectivePlugins } from '../../../plugins/index.ts';
+import { resolveEffectivePlugins } from '../../../plugins/discovery.ts';
 import type {
 	MCPConfig,
 	MCPOAuthConfig,

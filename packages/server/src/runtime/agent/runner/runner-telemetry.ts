@@ -2,16 +2,13 @@ import { logger } from '@ottocode/sdk';
 import { time } from '../../debug/index.ts';
 import type { RunOpts } from '../../session/queue.ts';
 import type { SetupResult } from './runner-setup.ts';
+import { nowMs } from './runner-setup-utils.ts';
+
+export { nowMs };
 
 type RunnerMessage =
 	| SetupResult['history'][number]
 	| SetupResult['additionalSystemMessages'][number];
-
-export function nowMs(): number {
-	const perf = globalThis.performance;
-	if (perf && typeof perf.now === 'function') return perf.now();
-	return Date.now();
-}
 
 export function approximateMessageChars(messages: RunnerMessage[]): number {
 	let total = 0;

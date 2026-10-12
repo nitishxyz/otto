@@ -1,35 +1,38 @@
 import type { getDb } from '@ottocode/database';
-import { messages, messageParts } from '@ottocode/database/schema';
-import { eq, desc } from 'drizzle-orm';
 import { estimateTokens, PRUNE_PROTECT } from './compaction-limits.ts';
+import { applyPartCompaction } from './compaction-mark.ts';
+import {
+	loadSessionMessages,
+	loadSessionPartsByMessageId,
+} from './session-order.ts';
 
 const PROTECTED_TOOLS = ['skill'];
 
+/**
+ * Hides old tool results (outside the last two user turns) from model
+ * history. Pruned results are rendered as "omitted by compaction", never as
+ * failures. Returns the number of parts confirmed updated; persistence
+ * failures propagate to the caller.
+ */
 export async function pruneSession(
 	db: Awaited<ReturnType<typeof getDb>>,
 	sessionId: string,
 ): Promise<{ pruned: number; saved: number }> {
-	const allMessages = await db
-		.select()
-		.from(messages)
-		.where(eq(messages.sessionId, sessionId))
-		.orderBy(desc(messages.createdAt));
+	const [allMessages, partsByMessageId] = await Promise.all([
+		loadSessionMessages(db, sessionId),
+		loadSessionPartsByMessageId(db, sessionId),
+	]);
 
 	let totalTokens = 0;
 	let prunedTokens = 0;
-	const toPrune: Array<{ id: string }> = [];
+	const toPrune: string[] = [];
 	let turns = 0;
 
-	for (const msg of allMessages) {
+	for (const msg of allMessages.toReversed()) {
 		if (msg.role === 'user') turns++;
 		if (turns < 2) continue;
 
-		const parts = await db
-			.select()
-			.from(messageParts)
-			.where(eq(messageParts.messageId, msg.id))
-			.orderBy(desc(messageParts.index));
-
+		const parts = (partsByMessageId.get(msg.id) ?? []).toReversed();
 		for (const part of parts) {
 			if (part.type !== 'tool_result') continue;
 			if (part.toolName && PROTECTED_TOOLS.includes(part.toolName)) continue;
@@ -51,22 +54,11 @@ export async function pruneSession(
 
 			if (totalTokens > PRUNE_PROTECT) {
 				prunedTokens += estimate;
-				toPrune.push({ id: part.id });
+				toPrune.push(part.id);
 			}
 		}
 	}
 
-	if (toPrune.length > 0) {
-		const compactedAt = Date.now();
-		for (const part of toPrune) {
-			try {
-				await db
-					.update(messageParts)
-					.set({ compactedAt })
-					.where(eq(messageParts.id, part.id));
-			} catch {}
-		}
-	}
-
-	return { pruned: toPrune.length, saved: prunedTokens };
+	const pruned = applyPartCompaction(db, toPrune);
+	return { pruned, saved: pruned > 0 ? prunedTokens : 0 };
 }

@@ -2,7 +2,7 @@ import { tool } from 'ai';
 import { z } from 'zod/v3';
 import { getDb } from '@ottocode/database';
 import { sessions, messages, messageParts } from '@ottocode/database/schema';
-import { eq, asc, count } from 'drizzle-orm';
+import { and, eq, asc, count } from 'drizzle-orm';
 
 const inputSchema = z.object({
 	sessionId: z.string().describe('The session ID to get context for'),
@@ -62,7 +62,12 @@ export function buildGetSessionContextTool(projectRoot: string) {
 					})
 					.from(messageParts)
 					.innerJoin(messages, eq(messageParts.messageId, messages.id))
-					.where(eq(messages.sessionId, input.sessionId))
+					.where(
+						and(
+							eq(messages.sessionId, input.sessionId),
+							eq(messageParts.type, 'tool_call'),
+						),
+					)
 					.groupBy(messageParts.toolName);
 
 				const uniqueTools: string[] = [];

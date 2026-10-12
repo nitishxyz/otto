@@ -1,5 +1,7 @@
 import { tool, type Tool } from 'ai';
 import { z } from 'zod/v3';
+import { setToolMetadata } from '@ottocode/sdk';
+import type { ToolSensitiveInput } from '@ottocode/sdk/tools/builtin/fs';
 import {
 	FORGE_ACTIONS,
 	FORGE_INPUT_KINDS,
@@ -222,14 +224,33 @@ const inputSchema = z.object({
 	extraArgs: z.array(z.string()).optional(),
 });
 
+/**
+ * Secret-bearing forge inputs. They are redacted from persisted calls,
+ * events, and approval previews; a missing API key for api-key auth is
+ * collected from the user through secure input.
+ */
+export const FORGE_SENSITIVE_INPUTS: ToolSensitiveInput[] = [
+	{
+		path: 'apiKey',
+		secureInput: {
+			prompt: 'Enter the provider API key',
+			when: (input) =>
+				input.kind === 'auth' &&
+				input.authMethod === 'api-key' &&
+				input.dryRun !== true &&
+				(input.action === 'authenticate' || input.action === 'reauthenticate'),
+		},
+	},
+	{ path: 'env.*' },
+	{ path: 'headers.*' },
+];
+
 export function buildForgeTool(projectRoot: string): {
 	name: string;
 	tool: Tool;
 } {
-	return {
-		name: 'forge',
-		tool: tool({
-			description: `Create, manage, and run Otto extensions and control-plane resources.
+	const forgeTool = tool({
+		description: `Create, manage, and run Otto extensions and control-plane resources.
 
 Kinds:
 - recipe, skill, agent: inventory, plan, create, update, or remove standalone capabilities; set plugin to mutate a contribution inside an editable local plugin
@@ -242,49 +263,54 @@ Kinds:
 - plugin-command: plan/create/update/remove terminal-backed namespaced slash commands; execute them in visible terminals
 - docs: authoritative, local, version-matched guides for recipe, skill, agent, plugin, plugin-tool, mcp-server, provider, auth, tunnel, or app; omit topic to discover topics
 
-Project scope is the default for extension work, including unpublished local plugins. Providers, auth, and machine tunnels are global. Prefer plan or dryRun before consequential configuration changes. OAuth and MCP servers may return authUrl/userCode; share them with the user. Never repeat apiKey or secret values.`,
-			inputSchema,
-			execute: async (input) => {
-				try {
-					if (input.action === 'docs' || input.action === 'capabilities') {
-						return await runForgeAction(projectRoot, input);
-					}
-					if (input.action === 'inventory') {
-						return {
-							ok: true,
-							inventory: await getForgeInventory(projectRoot),
-						};
-					}
-					if (input.kind === 'plugin-command') {
-						if (input.action !== 'execute') {
-							return await runForgeAction(projectRoot, input);
-						}
-						if (!input.plugin?.trim() || !input.commandName?.trim()) {
-							throw new Error(
-								'plugin and commandName are required for plugin-command',
-							);
-						}
-						if (input.dryRun) {
-							throw new Error(
-								'dryRun is not supported for plugin-command execution',
-							);
-						}
-						return await executePluginCommandForAgent(projectRoot, {
-							plugin: input.plugin,
-							command: input.commandName,
-							args: input.commandArgs,
-							argsText: input.argsText,
-							extraArgs: input.extraArgs,
-						});
-					}
+Project scope is the default for extension work, including unpublished local plugins. Providers, auth, and machine tunnels are global. Prefer plan or dryRun before consequential configuration changes. OAuth and MCP servers may return authUrl/userCode; share them with the user. For API-key auth, omit apiKey: the user is prompted securely. Never repeat apiKey or secret values.`,
+		inputSchema,
+		execute: async (input) => {
+			try {
+				if (input.action === 'docs' || input.action === 'capabilities') {
 					return await runForgeAction(projectRoot, input);
-				} catch (error) {
+				}
+				if (input.action === 'inventory') {
 					return {
-						ok: false,
-						error: error instanceof Error ? error.message : String(error),
+						ok: true,
+						inventory: await getForgeInventory(projectRoot),
 					};
 				}
-			},
-		}),
-	};
+				if (input.kind === 'plugin-command') {
+					if (input.action !== 'execute') {
+						return await runForgeAction(projectRoot, input);
+					}
+					if (!input.plugin?.trim() || !input.commandName?.trim()) {
+						throw new Error(
+							'plugin and commandName are required for plugin-command',
+						);
+					}
+					if (input.dryRun) {
+						throw new Error(
+							'dryRun is not supported for plugin-command execution',
+						);
+					}
+					return await executePluginCommandForAgent(projectRoot, {
+						plugin: input.plugin,
+						command: input.commandName,
+						args: input.commandArgs,
+						argsText: input.argsText,
+						extraArgs: input.extraArgs,
+					});
+				}
+				return await runForgeAction(projectRoot, input);
+			} catch (error) {
+				return {
+					ok: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	});
+	setToolMetadata(forgeTool, {
+		source: 'builtin',
+		activation: 'loadable',
+		sensitiveInputs: FORGE_SENSITIVE_INPUTS,
+	});
+	return { name: 'forge', tool: forgeTool };
 }

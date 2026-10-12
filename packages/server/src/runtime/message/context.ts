@@ -158,17 +158,16 @@ export async function prepareMessageContext(
 	};
 }
 
-export async function injectMessageContext(args: {
-	db: DispatchOptions['db'];
-	sessionId: string;
+/** Synthetic read call/result rows for preloaded context; not written. */
+export function buildMessageContextRows(args: {
 	messageId: string;
 	agent: string;
 	provider: string;
 	model: string;
 	prepared?: PreparedMessageContext;
-}): Promise<number> {
+}): Array<typeof messageParts.$inferInsert> {
 	const prepared = args.prepared;
-	if (!prepared || prepared.reads.length === 0) return 0;
+	if (!prepared || prepared.reads.length === 0) return [];
 	const summary = {
 		fileCount: prepared.reads.length,
 		requestedFileCount: prepared.requestedFileCount,
@@ -178,7 +177,7 @@ export async function injectMessageContext(args: {
 		preloadDurationMs: prepared.preloadDurationMs,
 		completedAt: prepared.completedAt,
 	};
-	const rows = prepared.reads.flatMap((read, readIndex) => {
+	return prepared.reads.flatMap((read, readIndex) => {
 		const callIndex = readIndex * 2;
 		return [
 			{
@@ -226,8 +225,16 @@ export async function injectMessageContext(args: {
 			},
 		];
 	});
+}
 
-	await args.db.insert(messageParts).values(rows);
+/** Records context metrics after the rows commit; returns estimated tokens. */
+export function registerPreparedContextMetrics(args: {
+	sessionId: string;
+	messageId: string;
+	prepared?: PreparedMessageContext;
+}): number {
+	const prepared = args.prepared;
+	if (!prepared || prepared.reads.length === 0) return 0;
 	registerMessageContextMetrics({
 		messageId: args.messageId,
 		sessionId: args.sessionId,
@@ -239,4 +246,19 @@ export async function injectMessageContext(args: {
 	});
 
 	return prepared.estimatedTokens;
+}
+
+export async function injectMessageContext(args: {
+	db: DispatchOptions['db'];
+	sessionId: string;
+	messageId: string;
+	agent: string;
+	provider: string;
+	model: string;
+	prepared?: PreparedMessageContext;
+}): Promise<number> {
+	const rows = buildMessageContextRows(args);
+	if (rows.length === 0) return 0;
+	await args.db.insert(messageParts).values(rows);
+	return registerPreparedContextMetrics(args);
 }

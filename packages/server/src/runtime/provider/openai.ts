@@ -1,33 +1,20 @@
 import type { OttoConfig } from '@ottocode/sdk';
-import {
-	getAuth,
-	createOpenAIOAuthModel,
-	createPromptCacheKeyFetch,
-} from '@ottocode/sdk';
-import { createOpenAI } from '@ai-sdk/openai';
+import { createProviderModel } from '@ottocode/sdk/providers';
 import { providerFetch } from './fetch.ts';
+import { getRunProviderAuth } from './credentials.ts';
 
 export async function resolveOpenAIModel(
 	model: string,
 	cfg: OttoConfig,
 	sessionId?: string,
 ) {
-	const auth = await getAuth('openai', cfg.projectRoot);
-	if (auth?.type === 'oauth') {
-		return createOpenAIOAuthModel(model, {
-			oauth: auth,
-			projectRoot: cfg.projectRoot,
-			sessionId,
-		});
-	}
-	if (auth?.type === 'api' && auth.key) {
-		const instance = createOpenAI({
-			apiKey: auth.key,
-			fetch: createPromptCacheKeyFetch(providerFetch, sessionId),
-		});
-		return instance(model);
-	}
-	return createOpenAI({
-		fetch: createPromptCacheKeyFetch(providerFetch, sessionId),
-	})(model);
+	const auth = await getRunProviderAuth('openai', cfg.projectRoot);
+	return createProviderModel('openai', model, {
+		apiKey: auth?.type === 'api' ? auth.key : undefined,
+		oauth: auth?.type === 'oauth' ? auth : undefined,
+		projectRoot: cfg.projectRoot,
+		sessionId,
+		baseURL: cfg.providers?.openai?.baseURL,
+		customFetch: providerFetch,
+	});
 }

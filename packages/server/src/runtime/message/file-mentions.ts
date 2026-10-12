@@ -1,5 +1,5 @@
-import { stat } from 'node:fs/promises';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { realpath, stat } from 'node:fs/promises';
+import { isAbsolute, normalize, relative, resolve } from 'node:path';
 import { rememberFileRead } from '@ottocode/sdk/tools/builtin/fs';
 
 const FILE_MENTION_REGEX = /(^|[\s([{])@(\S+)/g;
@@ -31,12 +31,23 @@ function isPathInsideRoot(path: string, root: string): boolean {
 	);
 }
 
-function resolveMentionPath(projectRoot: string, mentionPath: string) {
+/**
+ * Resolves a mention inside the project. Confinement is checked on the
+ * canonical (symlink-resolved) path, so a link escaping the root is rejected.
+ */
+async function resolveMentionPath(projectRoot: string, mentionPath: string) {
 	const root = resolve(projectRoot);
 	const absolutePath = isAbsolute(mentionPath)
 		? resolve(mentionPath)
 		: resolve(root, mentionPath);
 	if (!isPathInsideRoot(absolutePath, root)) return undefined;
+	const [canonicalRoot, canonicalPath] = await Promise.all([
+		realpath(root).catch(() => root),
+		realpath(absolutePath).catch(() => undefined),
+	]);
+	if (!canonicalPath || !isPathInsideRoot(canonicalPath, canonicalRoot)) {
+		return undefined;
+	}
 	return {
 		absolutePath,
 		relativePath: relative(root, absolutePath) || '.',
@@ -74,7 +85,7 @@ export async function resolveFileMentionReferences(args: {
 	const maxTotalBytes = args.maxTotalBytes ?? DEFAULT_MAX_TOTAL_BYTES;
 	const candidates = await Promise.all(
 		extractMentionTokens(args.text).map(async ({ mentionPath }) => {
-			const resolved = resolveMentionPath(projectRoot, mentionPath);
+			const resolved = await resolveMentionPath(projectRoot, mentionPath);
 			if (!resolved) return;
 			const fileStat = await stat(resolved.absolutePath).catch(() => undefined);
 			if (!fileStat?.isFile()) return;
@@ -95,6 +106,29 @@ export async function resolveFileMentionReferences(args: {
 	return resolved;
 }
 
+/**
+ * Pure fallback for messages stored without a mention snapshot: removes the
+ * `@` marker from mentions of files that were preloaded as context reads.
+ * Never touches the filesystem.
+ */
+export function stripPreloadedMentionMarkers(
+	text: string,
+	preloadedPaths: string[],
+): string {
+	if (preloadedPaths.length === 0 || !text.includes('@')) return text;
+	const preloaded = new Set(preloadedPaths.map((path) => normalize(path)));
+	return text.replace(
+		FILE_MENTION_REGEX,
+		(match, prefix: string, token: string) => {
+			const { mentionPath, trailing } = stripTrailingPunctuation(token);
+			if (!mentionPath || isAbsolute(mentionPath)) return match;
+			return preloaded.has(normalize(mentionPath))
+				? `${prefix}${mentionPath}${trailing}`
+				: match;
+		},
+	);
+}
+
 function stripTrailingPunctuation(token: string) {
 	const trailing = token.match(TRAILING_PUNCTUATION_REGEX)?.[0] ?? '';
 	return {
@@ -109,7 +143,7 @@ async function readMentionedTextFile(args: {
 	remainingBytes: number;
 	maxFileBytes: number;
 }) {
-	const resolved = resolveMentionPath(args.projectRoot, args.mentionPath);
+	const resolved = await resolveMentionPath(args.projectRoot, args.mentionPath);
 	if (!resolved) return undefined;
 	const fileStat = await stat(resolved.absolutePath).catch(() => undefined);
 	if (!fileStat?.isFile()) return undefined;
@@ -144,6 +178,11 @@ async function readMentionedTextFile(args: {
 	}
 }
 
+/**
+ * Dispatch-time snapshot of file mentions: inlines mentioned file content
+ * (except preloaded paths) and records the reads. History projection reuses
+ * the persisted result instead of rereading the filesystem.
+ */
 export async function preprocessFileMentionsForModel(args: {
 	text: string;
 	projectRoot?: string;
@@ -187,7 +226,7 @@ export async function preprocessFileMentionsForModel(args: {
 	const replaceByToken = new Map<string, string>();
 
 	for (const mention of mentions) {
-		const resolved = resolveMentionPath(projectRoot, mention.mentionPath);
+		const resolved = await resolveMentionPath(projectRoot, mention.mentionPath);
 		if (resolved && preloadedPaths.has(resolved.relativePath)) {
 			replaceByToken.set(
 				mention.token,

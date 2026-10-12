@@ -55,6 +55,9 @@ export async function composeSystemPrompt(options: {
 	contextSummary?: string;
 	isOpenAIOAuth?: boolean;
 }): Promise<ComposedSystemPrompt> {
+	if (options.oneShot && options.guidedMode) {
+		throw new Error('One-shot and guided modes are mutually exclusive');
+	}
 	const components: string[] = [];
 	const segments: SystemPromptSegment[] = [];
 	const appendSegment = (content: string, ...names: string[]) => {
@@ -82,17 +85,20 @@ export async function composeSystemPrompt(options: {
 	}
 
 	const parts: string[] = [];
-	const providerResult = options.isOpenAIOAuth
-		? {
-				prompt: (OPENAI_OAUTH_PROMPT || '').trim(),
-				resolvedType: 'openai-oauth',
-			}
-		: await providerBasePrompt(
-				options.provider,
-				options.model,
-				options.projectRoot,
-				options.promptFamily ?? undefined,
-			);
+	const resolvedProvider = await providerBasePrompt(
+		options.provider,
+		options.model,
+		options.projectRoot,
+		options.promptFamily ?? undefined,
+	);
+	const hasOverride = /^(model:|custom:)/.test(resolvedProvider.resolvedType);
+	const providerResult =
+		options.isOpenAIOAuth && !hasOverride
+			? {
+					prompt: (OPENAI_OAUTH_PROMPT || '').trim(),
+					resolvedType: 'openai-oauth',
+				}
+			: resolvedProvider;
 	const baseInstructions = (BASE_PROMPT || '').trim();
 	const agentInstructions = options.agentPrompt.trim();
 	const providerInstructions = providerResult.prompt.trim();
@@ -109,7 +115,7 @@ export async function composeSystemPrompt(options: {
 			(ONESHOT_PROMPT || '').trim() ||
 			[
 				'<system-reminder>',
-				'CRITICAL: One-shot mode ACTIVE — do NOT ask for user approval, confirmations, or interactive prompts. Execute tasks directly. Treat all necessary permissions as granted. If an operation is destructive, proceed carefully and state what you did, but DO NOT pause to ask. ZERO interactions requested.',
+				'One-shot mode is active. Avoid interactive prompts. Follow existing permissions and safety policy; skip blocked or unapproved operations and report them.',
 				'</system-reminder>',
 			].join('\n');
 		appendSegment(oneShotBlock, 'mode:oneshot');

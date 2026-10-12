@@ -73,7 +73,11 @@ async function discoverPluginScope(
 	const configPath = getPluginsConfigPath(scope, projectRoot);
 	const pluginsDir = getPluginsDir(scope, projectRoot);
 	const config = await loadPluginsConfig(scope, projectRoot);
-	const names = new Set<string>(Object.keys(config.plugins));
+	const names = new Set<string>(
+		Object.keys(config.plugins).filter(
+			(name) => pluginNameSchema.safeParse(name).success,
+		),
+	);
 
 	for (const dirName of await readPluginDirNames(pluginsDir)) {
 		names.add(dirName);

@@ -26,8 +26,11 @@ type CreateSessionInput = {
 	sessionType?: 'main' | 'branch' | 'handoff' | 'research' | 'btw' | 'subagent';
 };
 
-export async function createSession({
-	db,
+/**
+ * Validates provider/model access and builds a new session row without
+ * inserting it, so callers can insert it inside a larger transaction.
+ */
+export async function prepareSessionRow({
 	cfg,
 	agent,
 	provider,
@@ -36,7 +39,7 @@ export async function createSession({
 	title,
 	parentSessionId,
 	sessionType = 'main',
-}: CreateSessionInput): Promise<SessionRow> {
+}: Omit<CreateSessionInput, 'db'>): Promise<SessionRow> {
 	validateProviderModel(provider, model, cfg, { allowUnknownModel });
 	const authorized = await isProviderAuthorized(cfg, provider);
 	if (!authorized) {
@@ -47,7 +50,7 @@ export async function createSession({
 	await ensureProviderEnv(cfg, provider);
 	const id = crypto.randomUUID();
 	const now = Date.now();
-	const row: SessionRow = {
+	return {
 		id,
 		title: title ?? null,
 		agent,
@@ -69,12 +72,20 @@ export async function createSession({
 		contextSummary: null,
 		lastCompactedAt: null,
 		compactionMessageId: null,
+		compactionThroughMessageId: null,
+		inheritedContext: null,
 		parentSessionId: parentSessionId ?? null,
 		branchPointMessageId: null,
 		sessionType,
 	};
-	await db.insert(sessions).values(row);
-	publish({ type: 'session.created', sessionId: id, payload: row });
+}
+
+export async function createSession(
+	input: CreateSessionInput,
+): Promise<SessionRow> {
+	const row = await prepareSessionRow(input);
+	await input.db.insert(sessions).values(row);
+	publish({ type: 'session.created', sessionId: row.id, payload: row });
 	return row;
 }
 

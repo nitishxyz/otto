@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { MCPClientWrapper } from '../packages/sdk/src/core/src/mcp/client.ts';
 import { MCPServerManager } from '../packages/sdk/src/core/src/mcp/server-manager.ts';
-import { getShellEnvironment } from '../packages/sdk/src/core/src/tools/bin-manager.ts';
+import { getShellEnvironmentAsync } from '../packages/sdk/src/core/src/tools/bin-manager.ts';
 import { buildMCPServerConfig } from '../packages/server/src/routes/mcp/service/servers.ts';
 
 const temporaryDirectories: string[] = [];
@@ -51,7 +51,7 @@ describe('MCP stdio transport', () => {
 		process.env.SHELL = shell;
 		process.env.OTTO_TEST_LOGIN_PATH = loginBin;
 
-		const env = getShellEnvironment({ envMode: 'login-fresh' });
+		const env = await getShellEnvironmentAsync({ envMode: 'login-fresh' });
 		expect(env.PATH.split(delimiter)).toContain(loginBin);
 	});
 

@@ -69,21 +69,19 @@ async function persistReasoningPart(
 	db: Awaited<ReturnType<typeof getDb>>,
 ): Promise<void> {
 	if (state.persisted) return;
-	try {
-		await db.insert(messageParts).values({
-			id: state.partId,
-			messageId: state.opts.assistantMessageId,
-			index: await state.sharedCtx.nextIndex(),
-			stepIndex: state.getStepIndex(),
-			type: 'reasoning',
-			content: serializeReasoningContent(state),
-			agent: state.opts.agent,
-			provider: state.opts.provider,
-			model: state.opts.model,
-			startedAt: Date.now(),
-		});
-		state.persisted = true;
-	} catch {}
+	await db.insert(messageParts).values({
+		id: state.partId,
+		messageId: state.opts.assistantMessageId,
+		index: await state.sharedCtx.nextIndex(),
+		stepIndex: state.getStepIndex(),
+		type: 'reasoning',
+		content: serializeReasoningContent(state),
+		agent: state.opts.agent,
+		provider: state.opts.provider,
+		model: state.opts.model,
+		startedAt: Date.now(),
+	});
+	state.persisted = true;
 }
 
 export async function handleReasoningDelta(
@@ -110,14 +108,17 @@ export async function handleReasoningDelta(
 		reasoningStates.set(reasoningId, state);
 	}
 	state.text += text;
-	if (providerMetadata != null) {
-		state.providerMetadata = providerMetadata;
-	}
+	const metadataChanged = mergeReasoningMetadata(state, providerMetadata);
 
-	// Skip empty-text updates (e.g. Anthropic signature_delta from adaptive
-	// thinking emits reasoning-delta with `text: ""`). Publishing/persisting
-	// these would create an empty reasoning placeholder shown as `{"text":""}`.
-	if (!text) return;
+	// Empty-text updates (e.g. Anthropic signature_delta from adaptive thinking)
+	// never create a placeholder part, but metadata for an existing part is
+	// persisted so signatures survive.
+	if (!text) {
+		if (metadataChanged && state.persisted) {
+			queuePartContentWrite(db, state.partId, serializeReasoningContent(state));
+		}
+		return;
+	}
 
 	await persistReasoningPart(state, db);
 
@@ -143,27 +144,82 @@ function hasAnthropicRedactedReasoning(providerMetadata: unknown): boolean {
 	return 'redactedData' in anthropic;
 }
 
+function mergeReasoningMetadata(
+	state: ReasoningState,
+	providerMetadata: unknown,
+): boolean {
+	if (providerMetadata == null) return false;
+	const previous = state.providerMetadata;
+	if (
+		previous &&
+		typeof previous === 'object' &&
+		typeof providerMetadata === 'object'
+	) {
+		const merged: Record<string, unknown> = {
+			...(previous as Record<string, unknown>),
+		};
+		for (const [key, value] of Object.entries(
+			providerMetadata as Record<string, unknown>,
+		)) {
+			const existing = merged[key];
+			merged[key] =
+				existing &&
+				typeof existing === 'object' &&
+				value &&
+				typeof value === 'object'
+					? {
+							...(existing as Record<string, unknown>),
+							...(value as Record<string, unknown>),
+						}
+					: value;
+		}
+		state.providerMetadata = merged;
+	} else {
+		state.providerMetadata = providerMetadata;
+	}
+	return JSON.stringify(previous) !== JSON.stringify(state.providerMetadata);
+}
+
+async function finalizeReasoningState(
+	state: ReasoningState,
+	db: Awaited<ReturnType<typeof getDb>>,
+): Promise<void> {
+	if (!state.text || state.text.trim() === '') {
+		if (state.persisted) {
+			await db.delete(messageParts).where(eq(messageParts.id, state.partId));
+		}
+		return;
+	}
+	if (!state.persisted) await persistReasoningPart(state, db);
+	queuePartContentWrite(db, state.partId, serializeReasoningContent(state));
+	await db
+		.update(messageParts)
+		.set({ completedAt: Date.now() })
+		.where(eq(messageParts.id, state.partId));
+}
+
 export async function handleReasoningEnd(
 	reasoningId: string,
 	db: Awaited<ReturnType<typeof getDb>>,
 	reasoningStates: Map<string, ReasoningState>,
+	providerMetadata?: unknown,
 ): Promise<void> {
 	const state = reasoningStates.get(reasoningId);
 	if (!state) return;
-	if (!state.text || state.text.trim() === '') {
-		if (state.persisted) {
-			try {
-				await db.delete(messageParts).where(eq(messageParts.id, state.partId));
-			} catch {}
-		}
-		reasoningStates.delete(reasoningId);
-		return;
-	}
-	try {
-		await db
-			.update(messageParts)
-			.set({ completedAt: Date.now() })
-			.where(eq(messageParts.id, state.partId));
-	} catch {}
 	reasoningStates.delete(reasoningId);
+	mergeReasoningMetadata(state, providerMetadata);
+	await finalizeReasoningState(state, db);
+}
+
+/**
+ * Finalizes reasoning parts left open by an error, abort, or a stream that
+ * ended without `reasoning-end`.
+ */
+export async function finalizeOpenReasoningStates(
+	db: Awaited<ReturnType<typeof getDb>>,
+	reasoningStates: Map<string, ReasoningState>,
+): Promise<void> {
+	const open = Array.from(reasoningStates.values());
+	reasoningStates.clear();
+	for (const state of open) await finalizeReasoningState(state, db);
 }

@@ -1,13 +1,12 @@
 import {
 	buildLoadMCPToolsTool,
 	convertMCPToolsToAISDK,
-	getAuth,
 	getCachedMCPToolClassifications,
 	getMCPManager,
 	logger,
+	type DiscoveredTool,
 } from '@ottocode/sdk';
 import type { Tool } from 'ai';
-import { adaptTools as adaptToolsFn } from '../../../tools/adapter.ts';
 import type { RunOpts } from '../../session/queue.ts';
 import {
 	buildLazyPrepareStep,
@@ -18,34 +17,36 @@ import {
 	type LazyToolLoaderState,
 } from '../lazy-prepare-step.ts';
 import type { SetupResult } from './runner-setup.ts';
+import { getRunProviderAuth } from '../../provider/credentials.ts';
+import {
+	registerRunnerTools,
+	type ToolRegistrationMap,
+} from './runner-tool-registration.ts';
 
-function normalizeToolName(name: string): string {
-	return name.toLowerCase().replace(/_/g, '');
-}
-
-type MCPServerSummaryOutput = {
-	connected?: boolean;
-	tools?: unknown[];
-};
+type MCPServerSummaryOutput = { connected?: boolean; tools?: unknown[] };
 
 function addConnectedServerTools(
 	server: MCPServerSummaryOutput | undefined,
 	started: Set<string>,
 ): void {
 	if (!server?.connected || !Array.isArray(server.tools)) return;
-	for (const name of server.tools) {
+	for (const name of server.tools)
 		if (typeof name === 'string') started.add(name);
-	}
 }
 
-function collectStartedMCPToolNames(steps: unknown[]): Set<string> {
+function collectStartedMCPToolNames(
+	steps: unknown[],
+	registration: ToolRegistrationMap,
+): Set<string> {
 	const started = new Set<string>();
-	const previousSteps = steps as Array<{
+	for (const step of steps as Array<{
 		toolResults?: Array<{ toolName: string; output: unknown }>;
-	}>;
-	for (const step of previousSteps) {
+	}>) {
 		for (const result of step.toolResults ?? []) {
-			if (normalizeToolName(result.toolName) !== 'mcpmanager') continue;
+			if (
+				registration.registrationToCanonical[result.toolName] !== 'mcp_manager'
+			)
+				continue;
 			const output = result.output as
 				| {
 						server?: MCPServerSummaryOutput;
@@ -53,9 +54,8 @@ function collectStartedMCPToolNames(steps: unknown[]): Set<string> {
 				  }
 				| undefined;
 			addConnectedServerTools(output?.server, started);
-			for (const server of output?.servers ?? []) {
+			for (const server of output?.servers ?? [])
 				addConnectedServerTools(server, started);
-			}
 		}
 	}
 	return started;
@@ -65,97 +65,71 @@ function buildMCPToolRefresh(args: {
 	projectRoot: string;
 	toolset: Record<string, Tool>;
 	loader: LazyToolLoaderState;
-	sharedCtx: SetupResult['sharedCtx'];
-	provider: string;
-	authType?: string;
+	registration: ToolRegistrationMap;
+	register: (tools: DiscoveredTool[]) => Record<string, Tool>;
 }): (refreshArgs: { steps: unknown[] }) => void {
 	return ({ steps }) => {
 		const manager = getMCPManager(args.projectRoot);
-		if (!manager?.started) return;
-
-		const freshNames = manager
-			.getTools()
-			.map((entry) => entry.name)
-			.filter((name) => !(name in args.loader.toolRecord));
-		if (freshNames.length > 0) {
-			const freshSet = new Set(freshNames);
+		const liveNames = new Set(
+			manager?.started ? manager.getTools().map((entry) => entry.name) : [],
+		);
+		for (const name of Object.keys(args.loader.toolRecord)) {
+			if (liveNames.has(name)) continue;
+			const regName = args.loader.canonicalToRegistration[name];
+			delete args.loader.toolRecord[name];
+			delete args.loader.canonicalToRegistration[name];
+			if (regName === undefined) continue;
+			args.loader.loadedTools.delete(regName);
+			delete args.toolset[regName];
+			// Keep the exact inverse reserved for history and in-flight results.
+		}
+		const freshNames = new Set(
+			Array.from(liveNames).filter((name) => !(name in args.loader.toolRecord)),
+		);
+		if (manager?.started && freshNames.size) {
 			const converted = convertMCPToolsToAISDK(
 				manager,
 				getCachedMCPToolClassifications(args.projectRoot),
-			).filter(({ name }) => freshSet.has(name));
-			const adapted = adaptToolsFn(
-				converted,
-				args.sharedCtx,
-				args.provider,
-				args.authType,
-			);
+			).filter(({ name }) => freshNames.has(name));
+			const adapted = args.register(converted);
 			Object.assign(args.toolset, adapted);
-			const registrationKeys = Object.keys(adapted);
 			for (const { name, tool } of converted) {
+				const registered = args.registration.canonicalToRegistration[name];
+				if (registered === undefined || !Object.hasOwn(adapted, registered))
+					continue;
 				args.loader.toolRecord[name] = tool;
-				const normalized = normalizeToolName(name);
-				args.loader.canonicalToRegistration[name] =
-					registrationKeys.find(
-						(k) => k === name || normalizeToolName(k) === normalized,
-					) ?? name;
+				args.loader.canonicalToRegistration[name] = registered;
 			}
 		}
-
-		for (const name of collectStartedMCPToolNames(steps)) {
-			const regName = args.loader.canonicalToRegistration[name];
-			if (regName) args.loader.loadedTools.add(regName);
+		for (const name of collectStartedMCPToolNames(steps, args.registration)) {
+			const registered = args.loader.canonicalToRegistration[name];
+			if (registered !== undefined) args.loader.loadedTools.add(registered);
 		}
 	};
 }
 
-function buildCanonicalRegistrationMap(
-	canonicalRecord: Record<string, unknown>,
-	adaptedRecord: Record<string, unknown>,
-): Record<string, string> {
-	const registrationKeys = Object.keys(adaptedRecord);
-	const canonicalToRegistration: Record<string, string> = {};
-	for (const canonical of Object.keys(canonicalRecord)) {
-		const normalizedCanonical = normalizeToolName(canonical);
-		const regName = registrationKeys.find(
-			(k) => k === canonical || normalizeToolName(k) === normalizedCanonical,
-		);
-		canonicalToRegistration[canonical] = regName ?? canonical;
-	}
-	return canonicalToRegistration;
-}
-
-function findLoadToolRegistrationName(
-	toolset: Record<string, unknown>,
-	preferredName: string,
-): string {
-	const normalized = normalizeToolName(preferredName);
-	return (
-		Object.keys(toolset).find(
-			(k) => k === preferredName || normalizeToolName(k) === normalized,
-		) ?? preferredName
-	);
-}
-
 async function createLoaderState(args: {
 	record: Record<string, Tool>;
-	adapted: Record<string, unknown>;
-	toolset: Record<string, unknown>;
+	adapted: Record<string, Tool>;
+	registration: ToolRegistrationMap;
 	preferredLoadToolName: string;
-	collectInitialLoadedTools: (loadToolRegName: string) => Promise<string[]>;
+	collectInitialLoadedTools: (canonicalName: string) => Promise<string[]>;
 }): Promise<LazyToolLoaderState> {
-	const canonicalToRegistration = buildCanonicalRegistrationMap(
-		args.record,
-		args.adapted,
-	);
-	const loadToolRegName = findLoadToolRegistrationName(
-		args.toolset,
-		args.preferredLoadToolName,
-	);
+	const canonicalToRegistration: Record<string, string> = Object.create(null);
+	const acceptedRecord: Record<string, Tool> = Object.create(null);
+	for (const [name, tool] of Object.entries(args.record)) {
+		const registered = args.registration.canonicalToRegistration[name];
+		if (registered === undefined || !Object.hasOwn(args.adapted, registered))
+			continue;
+		canonicalToRegistration[name] = registered;
+		acceptedRecord[name] = tool;
+	}
 	return createLazyToolLoaderState(
-		args.record,
+		acceptedRecord,
 		canonicalToRegistration,
-		loadToolRegName,
-		await args.collectInitialLoadedTools(loadToolRegName),
+		args.registration.canonicalToRegistration[args.preferredLoadToolName] ??
+			args.preferredLoadToolName,
+		await args.collectInitialLoadedTools(args.preferredLoadToolName),
 	);
 }
 
@@ -167,48 +141,53 @@ export async function setupLazyToolLoading(
 	prepareStep?: ReturnType<typeof buildLazyPrepareStep>;
 }> {
 	let toolset = setup.toolset;
+	const registration = setup.toolRegistration;
 	const hasLazyTools = Object.keys(setup.lazyToolsRecord).length > 0;
 	const hasMCPTools = Object.keys(setup.mcpToolsRecord).length > 0;
-	const canManageMCP = [
-		...Object.keys(toolset),
-		...Object.keys(setup.lazyToolsRecord),
-	].some((name) => normalizeToolName(name) === 'mcpmanager');
-
-	if (!hasLazyTools && !hasMCPTools && !canManageMCP) {
-		return { toolset };
-	}
+	const canManageMCP =
+		registration.canonicalToRegistration.mcp_manager !== undefined ||
+		Object.hasOwn(setup.lazyToolsRecord, 'mcp_manager');
+	if (!hasLazyTools && !hasMCPTools && !canManageMCP) return { toolset };
 
 	const baseToolNames = Object.keys(toolset);
-	const providerAuth = await getAuth(opts.provider, setup.cfg.projectRoot);
+	const providerAuth = await getRunProviderAuth(
+		opts.provider,
+		setup.cfg.projectRoot,
+	);
+	const register = (tools: DiscoveredTool[]) =>
+		registerRunnerTools({
+			tools,
+			ctx: setup.sharedCtx,
+			provider: opts.provider,
+			authType: providerAuth?.type,
+			registration,
+		});
 	const loaders: LazyToolLoaderState[] = [];
-	const collectInitialLoadedTools = async (loadToolRegName: string) =>
+	const collectInitialLoadedTools = async (canonicalName: string) =>
 		Array.from(
 			new Set([
-				...collectLoadedToolsFromHistory(setup.history, loadToolRegName),
+				...collectLoadedToolsFromHistory(setup.history, canonicalName),
 				...(await collectLoadedToolsFromSession(
 					setup.db,
 					opts.sessionId,
-					loadToolRegName,
+					canonicalName,
 				)),
 			]),
 		);
 
 	if (hasLazyTools) {
-		const adaptedLazy = adaptToolsFn(
+		const adaptedLazy = register(
 			Object.entries(setup.lazyToolsRecord).map(([name, tool]) => ({
 				name,
 				tool,
 			})),
-			setup.sharedCtx,
-			opts.provider,
-			providerAuth?.type,
 		);
 		toolset = { ...toolset, ...adaptedLazy };
 		loaders.push(
 			await createLoaderState({
 				record: setup.lazyToolsRecord,
 				adapted: adaptedLazy,
-				toolset,
+				registration,
 				preferredLoadToolName: 'load_tools',
 				collectInitialLoadedTools,
 			}),
@@ -218,71 +197,57 @@ export async function setupLazyToolLoading(
 	let mcpLoader: LazyToolLoaderState | undefined;
 	if (hasMCPTools || canManageMCP) {
 		const adaptedMCP = hasMCPTools
-			? adaptToolsFn(
+			? register(
 					Object.entries(setup.mcpToolsRecord).map(([name, tool]) => ({
 						name,
 						tool,
 					})),
-					setup.sharedCtx,
-					opts.provider,
-					providerAuth?.type,
 				)
 			: {};
-		if (hasMCPTools) {
-			toolset = { ...toolset, ...adaptedMCP };
-		}
-
+		toolset = { ...toolset, ...adaptedMCP };
 		const preload = hasMCPTools ? await setup.mcpPreload.result : null;
 		const preloaded = new Set(preload?.selected ?? []);
-		if (preloaded.size > 0) {
-			const loadToolRegName = findLoadToolRegistrationName(
-				toolset,
-				'load_mcp_tools',
-			);
-			if (loadToolRegName in toolset) {
+		if (preloaded.size) {
+			const loadToolRegName =
+				registration.canonicalToRegistration.load_mcp_tools;
+			if (
+				loadToolRegName !== undefined &&
+				Object.hasOwn(toolset, loadToolRegName)
+			) {
 				const compact = buildLoadMCPToolsTool(setup.mcpToolBriefs, {
 					preloaded,
 				});
-				const adaptedLoad = adaptToolsFn(
-					[{ name: compact.name, tool: compact.tool }],
-					setup.sharedCtx,
-					opts.provider,
-					providerAuth?.type,
-				);
-				const replacement = Object.values(adaptedLoad)[0];
-				if (replacement)
-					toolset = { ...toolset, [loadToolRegName]: replacement };
+				const replacement = register([
+					{ name: compact.name, tool: compact.tool },
+				])[loadToolRegName];
+				if (replacement) toolset[loadToolRegName] = replacement;
 			}
 			logger.debug('[mcp] pre-activated tools for turn', {
 				sessionId: opts.sessionId,
 				tools: Array.from(preloaded),
 			});
 		}
-
 		mcpLoader = await createLoaderState({
 			record: setup.mcpToolsRecord,
 			adapted: adaptedMCP,
-			toolset,
+			registration,
 			preferredLoadToolName: 'load_mcp_tools',
-			collectInitialLoadedTools: async (loadToolRegName) => [
-				...(await collectInitialLoadedTools(loadToolRegName)),
+			collectInitialLoadedTools: async (name) => [
+				...(await collectInitialLoadedTools(name)),
 				...preloaded,
 			],
 		});
 		loaders.push(mcpLoader);
 	}
-
 	const refresh = mcpLoader
 		? buildMCPToolRefresh({
 				projectRoot: setup.cfg.projectRoot,
 				toolset,
 				loader: mcpLoader,
-				sharedCtx: setup.sharedCtx,
-				provider: opts.provider,
-				authType: providerAuth?.type,
+				registration,
+				register,
 			})
 		: undefined;
-
 	return {
 		toolset,
 		prepareStep: buildLazyPrepareStep(

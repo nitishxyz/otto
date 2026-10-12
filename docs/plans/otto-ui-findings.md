@@ -1,5 +1,7 @@
 # Otto Web SDK UI Audit Findings
 
+> **Superseded (October 2026):** the audited `components/otto/` directory no longer exists.
+
 Audit of `packages/web-sdk/src/components/otto/` (read-only review). Covers
 `OttoGoalBar.tsx`, `OttoTabBar.tsx`, `OttoSessionRail.tsx`, `OttoWorkspace.tsx`,
 `OttoSessionView.tsx`, and `index.ts`, plus referenced modules

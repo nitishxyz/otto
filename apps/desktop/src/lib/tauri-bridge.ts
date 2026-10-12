@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { NotificationWindowContext } from './notification-routing';
 
 export interface Project {
 	path: string;
@@ -111,6 +112,10 @@ export const tauriBridge = {
 	listSystemFonts: () => invoke<string[]>('list_system_fonts'),
 	showNativeNotification: (notification: NativeNotificationPayload) =>
 		invoke('show_native_notification', { notification }),
+	setNotificationWindowContext: (context: NotificationWindowContext | null) =>
+		invoke<void>('set_notification_window_context', { context }),
+	getInitialNotification: () =>
+		invoke<NotificationWindowContext | null>('get_initial_notification'),
 
 	createNewWindow: () => invoke('create_new_window'),
 	setCurrentMachine: (device: TunnelDevice | null) =>

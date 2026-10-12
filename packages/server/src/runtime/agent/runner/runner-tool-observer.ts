@@ -1,4 +1,4 @@
-import { subscribe } from '../../../events/bus.ts';
+import { subscribeScopedSessionEvents } from '../../../events/bus.ts';
 import type { OttoEvent } from '../../../events/types.ts';
 import type { createTurnDumpCollector } from '../../debug/turn-dump.ts';
 
@@ -13,8 +13,32 @@ type TurnDumpCollector = NonNullable<
 	ReturnType<typeof createTurnDumpCollector>
 >;
 
+type ToolEventPayload = {
+	name?: string;
+	callId?: string;
+	messageId?: string;
+	args?: unknown;
+	result?: unknown;
+};
+
+const SYNTHETIC_TOOL_NAMES = new Set(['memory_context']);
+
+function toolPayload(evt: OttoEvent): ToolEventPayload {
+	const payload = evt.payload;
+	return payload && typeof payload === 'object'
+		? (payload as ToolEventPayload)
+		: {};
+}
+
+/**
+ * Observes tool events for one assistant run. Subscribes on the run's project
+ * scope and ignores events published for other assistant messages of the same
+ * session.
+ */
 export function observeRunnerToolEvents(args: {
 	sessionId: string;
+	projectRoot: string;
+	messageId?: string;
 	dump: TurnDumpCollector | null;
 	getStepIndex: () => number;
 	onToolCall?: () => void;
@@ -26,55 +50,55 @@ export function observeRunnerToolEvents(args: {
 		lastToolName: undefined,
 	};
 
-	const unsubscribe = subscribe(args.sessionId, (evt: OttoEvent) => {
-		if (evt.type === 'tool.call' || evt.type === 'tool.result') {
-			state.toolActivityObserved = true;
-			state.trailingAssistantTextAfterTool = false;
-			state.endedWithToolActivity = true;
-			try {
-				state.lastToolName = (
-					evt.payload as { name?: string } | undefined
-				)?.name;
-			} catch {
-				state.lastToolName = undefined;
-			}
+	const handler = (evt: OttoEvent) => {
+		if (evt.type !== 'tool.call' && evt.type !== 'tool.result') return;
+		const payload = toolPayload(evt);
+		if (payload.name && SYNTHETIC_TOOL_NAMES.has(payload.name)) return;
+		if (
+			args.messageId &&
+			payload.messageId &&
+			payload.messageId !== args.messageId
+		) {
+			return;
 		}
+		state.toolActivityObserved = true;
+		state.trailingAssistantTextAfterTool = false;
+		state.endedWithToolActivity = true;
+		state.lastToolName = payload.name;
+
 		if (evt.type === 'tool.call') {
 			args.onToolCall?.();
-			if (args.dump) {
-				try {
-					const p = evt.payload as {
-						name?: string;
-						callId?: string;
-						args?: unknown;
-					};
-					args.dump.recordToolCall(
-						args.getStepIndex(),
-						p.name ?? '',
-						p.callId ?? '',
-						p.args,
-					);
-				} catch {}
-			}
+			try {
+				args.dump?.recordToolCall(
+					args.getStepIndex(),
+					payload.name ?? '',
+					payload.callId ?? '',
+					payload.args,
+				);
+			} catch {}
+			return;
 		}
-		if (evt.type === 'tool.result') {
-			if (args.dump) {
-				try {
-					const p = evt.payload as {
-						name?: string;
-						callId?: string;
-						result?: unknown;
-					};
-					args.dump.recordToolResult(
-						args.getStepIndex(),
-						p.name ?? '',
-						p.callId ?? '',
-						p.result,
-					);
-				} catch {}
-			}
-		}
-	});
+		try {
+			args.dump?.recordToolResult(
+				args.getStepIndex(),
+				payload.name ?? '',
+				payload.callId ?? '',
+				payload.result,
+			);
+		} catch {}
+	};
+
+	let active = true;
+	const unsubscribeBus = subscribeScopedSessionEvents(
+		args.sessionId,
+		handler,
+		args.projectRoot,
+	);
+	const unsubscribe = () => {
+		if (!active) return;
+		active = false;
+		unsubscribeBus();
+	};
 
 	return { state, unsubscribe };
 }

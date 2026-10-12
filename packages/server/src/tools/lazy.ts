@@ -14,10 +14,20 @@ export type ConfiguredServerTool = {
 	tool: Tool;
 };
 
+type ServerLazyToolName = (typeof SERVER_LAZY_TOOL_CATALOG)[number]['name'];
+
+/** Factory per catalog entry; the type requires one for every entry. */
+const SERVER_LAZY_TOOL_FACTORIES: Record<
+	ServerLazyToolName,
+	ServerLazyToolDefinition['build']
+> = {
+	forge: buildForgeTool,
+};
+
 export function getServerLazyToolDefinitions(): ServerLazyToolDefinition[] {
 	return SERVER_LAZY_TOOL_CATALOG.map((definition) => ({
 		...definition,
-		build: buildForgeTool,
+		build: SERVER_LAZY_TOOL_FACTORIES[definition.name],
 	}));
 }
 

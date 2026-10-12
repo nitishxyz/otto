@@ -20,10 +20,13 @@ import {
 	type PluginManifest,
 	type PluginScope,
 } from '@ottocode/sdk';
-import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { getAllAgentDetails } from '../agent/config-management.ts';
+import { atomicWriteForgeJson } from './atomic-write.ts';
 import type { ForgeInput, ForgePlan, ForgeScope } from './types.ts';
+
+export { atomicWriteForgeJson } from './atomic-write.ts';
 
 function pluginScope(input: ForgeInput): PluginScope {
 	return input.scope ?? 'project';
@@ -74,20 +77,6 @@ async function pathExists(path: string): Promise<boolean> {
 		return true;
 	} catch {
 		return false;
-	}
-}
-
-export async function atomicWriteForgeJson(
-	path: string,
-	value: unknown,
-): Promise<void> {
-	const temporaryPath = `${path}.forge-${crypto.randomUUID()}.tmp`;
-	await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-	try {
-		await rename(temporaryPath, path);
-	} catch (error) {
-		await rm(temporaryPath, { force: true });
-		throw error;
 	}
 }
 

@@ -1,12 +1,14 @@
 import { pluginManifestSchema, type PluginCommand } from '@ottocode/sdk';
-import { readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import type {
 	ForgeInput,
 	ForgeMutation,
 	ForgePlan,
 	ForgeScope,
 } from './types.ts';
+import { atomicWriteForgeJson } from './atomic-write.ts';
 import { assertForgePluginMutable, resolveForgePlugin } from './plugin.ts';
+import { redactPluginCommand } from './redact.ts';
 
 const COMMAND_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
@@ -82,20 +84,6 @@ function buildCommand(
 	};
 }
 
-async function atomicWriteManifest(
-	path: string,
-	value: unknown,
-): Promise<void> {
-	const temporaryPath = `${path}.forge-${crypto.randomUUID()}.tmp`;
-	await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-	try {
-		await rename(temporaryPath, path);
-	} catch (error) {
-		await rm(temporaryPath, { force: true });
-		throw error;
-	}
-}
-
 export async function runForgePluginCommandAction(
 	projectRoot: string,
 	input: ForgeInput,
@@ -127,20 +115,9 @@ export async function runForgePluginCommandAction(
 	if (Object.keys(commands).length > 0) nextManifest.commands = commands;
 	else delete nextManifest.commands;
 	pluginManifestSchema.parse(nextManifest);
-	const previewCommand = commands[commandName]
-		? {
-				...commands[commandName],
-				...(commands[commandName].env
-					? {
-							env: Object.fromEntries(
-								Object.keys(commands[commandName].env).map((key) => [
-									key,
-									'<redacted>',
-								]),
-							),
-						}
-					: {}),
-			}
+	const nextCommand = commands[commandName];
+	const previewCommand = nextCommand
+		? redactPluginCommand(nextCommand)
 		: undefined;
 	const scope = plugin.scope as ForgeScope;
 	const plan: ForgePlan = {
@@ -163,12 +140,12 @@ export async function runForgePluginCommandAction(
 	if (input.action === 'plan' || input.dryRun) {
 		return { ok: true, applied: false, plan };
 	}
-	await atomicWriteManifest(plugin.manifestPath, nextManifest);
+	await atomicWriteForgeJson(plugin.manifestPath, nextManifest);
 	return {
 		ok: true,
 		applied: true,
 		plan,
-		command: action === 'remove' ? undefined : commands[commandName],
+		command: action === 'remove' ? undefined : previewCommand,
 		slashCommand: `/${pluginName} ${commandName}`,
 	};
 }

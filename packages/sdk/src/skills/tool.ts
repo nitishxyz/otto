@@ -7,31 +7,42 @@ import {
 	findGitRoot,
 	loadSkillFile,
 	discoverSkillFiles,
+	getSkillRegistry,
+	getRegistrySkills,
+	type SkillRegistry,
 } from './loader.ts';
 import { scanContent } from './security.ts';
 import type { DiscoveredSkill, SkillResult } from './types.ts';
 import type { SkillSettings } from '../types/src/config.ts';
 
-let cachedSkillList: DiscoveredSkill[] = [];
-let initializedForPath: string | null = null;
-let cachedSkillSettings: SkillSettings | undefined;
+const initializedPaths = new Set<string>();
+const registrySettings = new WeakMap<
+	SkillRegistry,
+	SkillSettings | undefined
+>();
 
 export async function initializeSkills(
 	cwd: string,
 	repoRoot?: string,
 ): Promise<DiscoveredSkill[]> {
 	const root = repoRoot ?? (await findGitRoot(cwd)) ?? cwd;
-	cachedSkillList = await discoverSkills(cwd, root);
-	initializedForPath = cwd;
-	return cachedSkillList;
+	const skills = await discoverSkills(cwd, root);
+	initializedPaths.add(cwd);
+	return skills;
 }
 
 export function getDiscoveredSkills(): DiscoveredSkill[] {
-	return cachedSkillList;
+	return getRegistrySkills();
 }
 
-export function setSkillSettings(settings?: SkillSettings): void {
-	cachedSkillSettings = settings;
+export function setSkillSettings(
+	settings?: SkillSettings,
+	skills?: DiscoveredSkill[],
+): void {
+	registrySettings.set(
+		getSkillRegistry(skills),
+		settings ? structuredClone(settings) : undefined,
+	);
 }
 
 export function filterDiscoveredSkills(
@@ -48,14 +59,31 @@ export function filterDiscoveredSkills(
 }
 
 export function isSkillsInitialized(forPath?: string): boolean {
-	if (!initializedForPath) return false;
-	if (forPath && forPath !== initializedForPath) return false;
-	return true;
+	return forPath ? initializedPaths.has(forPath) : initializedPaths.size > 0;
 }
 
-export function buildSkillTool(): { name: string; tool: Tool } {
+export function buildSkillTool(
+	skills?: DiscoveredSkill[],
+	settings = registrySettings.get(getSkillRegistry(skills)),
+): { name: string; tool: Tool } {
+	const registry = getSkillRegistry(skills);
+	const enabled = new Set(
+		filterDiscoveredSkills(
+			skills ??
+				Array.from(registry.values()).map((skill) => ({
+					name: skill.metadata.name,
+					description: skill.metadata.description,
+					path: skill.path,
+					scope: skill.scope,
+				})),
+			settings,
+		).map((skill) => skill.name),
+	);
 	const skillTool = tool({
-		description: buildSkillDescription(),
+		description: buildSkillDescription(
+			skills ?? getDiscoveredSkills(),
+			settings,
+		),
 		inputSchema: z.object({
 			name: z
 				.string()
@@ -74,24 +102,32 @@ export function buildSkillTool(): { name: string; tool: Tool } {
 			name: string;
 			file?: string;
 		}): Promise<SkillResult> {
+			if (!enabled.has(name))
+				return {
+					ok: false,
+					error: `Skill '${name}' is disabled or unavailable`,
+				};
 			if (file) {
-				return loadSubFile(name, file);
+				return loadSubFile(name, file, registry);
 			}
-			return loadMainSkill(name);
+			return loadMainSkill(name, registry);
 		},
 	});
 
 	return { name: 'skill', tool: skillTool };
 }
 
-async function loadMainSkill(name: string): Promise<SkillResult> {
-	const skill = await loadSkill(name);
+async function loadMainSkill(
+	name: string,
+	registry: SkillRegistry,
+): Promise<SkillResult> {
+	const skill = await loadSkill(name, registry);
 	if (!skill) {
 		return { ok: false, error: `Skill '${name}' not found` };
 	}
 
 	const [availableFiles, securityNotices] = await Promise.all([
-		discoverSkillFiles(name),
+		discoverSkillFiles(name, registry),
 		Promise.resolve(scanContent(skill.content)),
 	]);
 
@@ -114,15 +150,16 @@ async function loadMainSkill(name: string): Promise<SkillResult> {
 async function loadSubFile(
 	name: string,
 	filePath: string,
+	registry: SkillRegistry,
 ): Promise<SkillResult> {
-	const skill = await loadSkill(name);
+	const skill = await loadSkill(name, registry);
 	if (!skill) {
 		return { ok: false, error: `Skill '${name}' not found` };
 	}
 
-	const result = await loadSkillFile(name, filePath);
+	const result = await loadSkillFile(name, filePath, registry);
 	if (!result) {
-		const availableFiles = await discoverSkillFiles(name);
+		const availableFiles = await discoverSkillFiles(name, registry);
 		const fileList = availableFiles.map((f) => f.relativePath).join(', ');
 		return {
 			ok: false,
@@ -146,11 +183,11 @@ async function loadSubFile(
 	};
 }
 
-function buildSkillDescription(): string {
-	const enabledSkills = filterDiscoveredSkills(
-		cachedSkillList,
-		cachedSkillSettings,
-	);
+function buildSkillDescription(
+	skills = getDiscoveredSkills(),
+	settings = registrySettings.get(getSkillRegistry()),
+): string {
+	const enabledSkills = filterDiscoveredSkills(skills, settings);
 	if (enabledSkills.length === 0) {
 		return 'Load a specialized skill when the task matches one of the skills listed in the system prompt. No skills are currently available.';
 	}

@@ -9,11 +9,7 @@ import { updateTodosTool } from './builtin/todos.ts';
 import { buildWebSearchTool } from './builtin/websearch.ts';
 import { buildTerminalTool } from './builtin/terminal.ts';
 import type { TerminalManager } from '../terminals/index.ts';
-import {
-	initializeSkills,
-	buildSkillTool,
-	setSkillSettings,
-} from '../../../skills/index.ts';
+import { initializeSkills, buildSkillTool } from '../../../skills/index.ts';
 import { ensureMCPManager } from '../mcp/index.ts';
 import { resolveMCPToolClassifications } from '../mcp/classification-registry.ts';
 import {
@@ -90,8 +86,18 @@ export function getTerminalManager(
 function getStaticToolDiscoveryCacheKey(
 	projectRoot: string,
 	readOnlyRoots: string[] = [],
+	skillSettings?: {
+		enabled?: boolean;
+		items?: Record<string, { enabled?: boolean }>;
+	},
 ): string {
-	return `${projectRoot}::${[...readOnlyRoots].sort().join('\0')}`;
+	return `${projectRoot}::${JSON.stringify({
+		readOnlyRoots: [...readOnlyRoots].sort(),
+		enabled: skillSettings?.enabled,
+		items: Object.entries(skillSettings?.items ?? {}).sort(([a], [b]) =>
+			a.localeCompare(b),
+		),
+	})}`;
 }
 
 async function discoverStaticProjectTools(
@@ -102,8 +108,11 @@ async function discoverStaticProjectTools(
 	},
 	readOnlyRoots: string[] = [],
 ): Promise<DiscoveredTool[]> {
-	setSkillSettings(skillSettings);
-	const cacheKey = getStaticToolDiscoveryCacheKey(projectRoot, readOnlyRoots);
+	const cacheKey = getStaticToolDiscoveryCacheKey(
+		projectRoot,
+		readOnlyRoots,
+		skillSettings,
+	);
 	const cached = staticToolDiscoveryCache.get(cacheKey);
 	if (cached) return cached;
 
@@ -114,7 +123,7 @@ async function discoverStaticProjectTools(
 			tools.set(name, tool);
 		// Put apply_patch before exact replacement tools so models see it as the
 		// default editing path after reading files.
-		const ap = buildApplyPatchTool(projectRoot);
+		const ap = buildApplyPatchTool(projectRoot, readOnlyRoots);
 		tools.set(ap.name, ap.tool);
 		for (const { name, tool } of fsTools.filter(({ name }) => name !== 'read'))
 			tools.set(name, tool);
@@ -133,8 +142,8 @@ async function discoverStaticProjectTools(
 		const ws = buildWebSearchTool();
 		tools.set(ws.name, ws.tool);
 		// Skills
-		await initializeSkills(projectRoot);
-		const skillTool = buildSkillTool();
+		const skills = await initializeSkills(projectRoot);
+		const skillTool = buildSkillTool(skills, skillSettings);
 		tools.set(skillTool.name, skillTool.tool);
 
 		for (const extension of await discoverNativeExtensionTools(projectRoot)) {
@@ -171,7 +180,6 @@ export async function discoverProjectTools(
 	readOnlyRoots: string[] = [],
 	options: DiscoverProjectToolsOptions = {},
 ): Promise<DiscoverResult> {
-	setSkillSettings(skillSettings);
 	const staticTools = await discoverStaticProjectTools(
 		projectRoot,
 		skillSettings,

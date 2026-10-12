@@ -2,7 +2,7 @@ import type { Tool } from 'ai';
 import { shellExecutorContext } from '@ottocode/sdk';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
 import { attachTerminalSecureInput } from '../../runtime/tools/terminal-secure-input.ts';
-import { getCwd, joinRelative, setCwd } from '../../runtime/utils/cwd.ts';
+import { getCwd, setCwd } from '../../runtime/utils/cwd.ts';
 import { createSecureShellExecutor } from './secure-shell.ts';
 import { getTerminalId } from './stream.ts';
 
@@ -19,6 +19,11 @@ type ToolExecuteOptions = ToolExecuteSignature['options'] extends never
 	: ToolExecuteSignature['options'];
 type ToolExecuteReturn = ToolExecuteSignature['result'];
 
+/**
+ * Runs the underlying tool. `input` must already be resolved by
+ * `prepareToolCall`: path fields are project-relative or absolute and do
+ * not depend on the session cwd.
+ */
 export function executeBaseTool(
 	ctx: ToolAdapterContext,
 	args: {
@@ -37,43 +42,18 @@ export function executeBaseTool(
 	}
 
 	if (name === 'cd') {
-		const next = joinRelative(
-			cwd,
-			String((input as Record<string, unknown>)?.path ?? '.'),
-		);
+		const path = (input as Record<string, unknown> | undefined)?.path;
+		if (typeof path !== 'string' || !path) return { cwd };
+		const next = path;
 		setCwd(ctx.sessionId, next);
 		return { cwd: next };
 	}
 
-	if (
-		['read', 'write', 'ls', 'tree'].includes(name) &&
-		typeof (input as Record<string, unknown>)?.path === 'string'
-	) {
-		const rel = joinRelative(
-			cwd,
-			String((input as Record<string, unknown>).path),
-		);
-		const nextInput = {
-			...(input as Record<string, unknown>),
-			path: rel,
-		} as ToolExecuteInput;
-		// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
-		return base.execute?.(nextInput, options as any);
-	}
-
 	if (name === 'shell' || name === 'bash') {
-		const needsCwd =
-			!input || typeof (input as Record<string, unknown>).cwd !== 'string';
-		const nextInput = needsCwd
-			? ({
-					...(input as Record<string, unknown>),
-					cwd,
-				} as ToolExecuteInput)
-			: input;
 		const secureShellExecutor = createSecureShellExecutor({ ctx, callId });
 		return shellExecutorContext.run(secureShellExecutor, () => {
 			// biome-ignore lint/suspicious/noExplicitAny: AI SDK types are complex
-			return base.execute?.(nextInput, options as any);
+			return base.execute?.(input, options as any);
 		}) as ToolExecuteReturn;
 	}
 

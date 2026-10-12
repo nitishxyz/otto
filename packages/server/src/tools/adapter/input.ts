@@ -1,24 +1,20 @@
 import type { Tool } from 'ai';
-import { getToolMetadata, logger } from '@ottocode/sdk';
+import { logger } from '@ottocode/sdk';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
-import {
-	requiresApproval,
-	requestApproval,
-	skipsGuardApproval,
-} from '../../runtime/tools/approval.ts';
-import { guardToolCall } from '../../runtime/tools/guards.ts';
 import { logToolCall, publishToolCall, publishToolDelta } from './events.ts';
 import { persistToolCall } from './persistence.ts';
 import {
+	ensureToolCallRecord,
 	extractToolCallId,
-	getPendingQueue,
-	type PendingCallMeta,
+	type ToolCallRecords,
 } from './pending.ts';
+import { redactToolInput, suppressesInputDeltas } from './sensitive.ts';
+import { unwrapDoubleWrappedArgs } from './model-output.ts';
 
 type InputHandlerArgs = {
 	base: Tool;
 	ctx: ToolAdapterContext;
-	pendingCalls: Map<string, PendingCallMeta[]>;
+	records: ToolCallRecords;
 	name: string;
 	options: unknown;
 };
@@ -27,22 +23,12 @@ type InputAvailableArgs = InputHandlerArgs & {
 	markFirstToolCallReported: () => boolean;
 };
 
-function resolvePendingMeta(args: InputHandlerArgs): PendingCallMeta {
-	const sdkCallId = extractToolCallId(args.options);
-	const queue = getPendingQueue(args.pendingCalls, args.name);
-	let meta = queue.length ? queue[queue.length - 1] : undefined;
-	if (!meta) {
-		meta = {
-			callId: sdkCallId || crypto.randomUUID(),
-			startTs: Date.now(),
-			stepIndex: args.ctx.stepIndex,
-		};
-		queue.push(meta);
-	}
-	if (sdkCallId && meta.callId !== sdkCallId && !meta.hasPublishedDelta) {
-		meta.callId = sdkCallId;
-	}
-	return meta;
+function recordFor(args: InputHandlerArgs) {
+	return ensureToolCallRecord(args.records, {
+		callId: extractToolCallId(args.options),
+		name: args.name,
+		stepIndex: args.ctx.stepIndex,
+	});
 }
 
 async function callBaseInputHook(
@@ -56,42 +42,49 @@ async function callBaseInputHook(
 }
 
 export async function handleAdaptedToolInputStart(args: InputHandlerArgs) {
-	const sdkCallId = extractToolCallId(args.options);
-	const queue = getPendingQueue(args.pendingCalls, args.name);
-	queue.push({
-		callId: sdkCallId || crypto.randomUUID(),
-		startTs: Date.now(),
-		stepIndex: args.ctx.stepIndex,
-	});
+	recordFor(args);
 	await callBaseInputHook(args.base, 'onInputStart', args.options);
 }
 
 export async function handleAdaptedToolInputDelta(args: InputHandlerArgs) {
 	const delta = (args.options as { inputTextDelta?: string } | undefined)
 		?.inputTextDelta;
-	const meta = resolvePendingMeta(args);
-	publishToolDelta(args.ctx, {
-		name: args.name,
-		channel: 'input',
-		delta,
-		stepIndex: meta.stepIndex ?? args.ctx.stepIndex,
-		callId: meta.callId,
-	});
-	meta.hasPublishedDelta = true;
+	const record = recordFor(args);
+	if (record.finalized) return;
+	if (!suppressesInputDeltas(args.base)) {
+		publishToolDelta(args.ctx, {
+			name: args.name,
+			channel: 'input',
+			delta,
+			stepIndex: record.stepIndex ?? args.ctx.stepIndex,
+			callId: record.callId,
+		});
+		record.hasPublishedDelta = true;
+	}
 	await callBaseInputHook(args.base, 'onInputDelta', args.options);
 }
 
+/**
+ * Records the complete input for this call id and announces the call.
+ * Policy (path resolution, guards, approval) runs at execution time on the
+ * resolved arguments; see `prepareToolCall`.
+ */
 export async function handleAdaptedToolInputAvailable(
 	args: InputAvailableArgs,
 ) {
-	const input = (args.options as { input?: unknown } | undefined)?.input;
-	const meta = resolvePendingMeta(args);
-	meta.stepIndex = args.ctx.stepIndex;
-	meta.args = input;
+	const input = unwrapDoubleWrappedArgs(
+		(args.options as { input?: unknown } | undefined)?.input,
+		args.name,
+	);
+	const record = recordFor(args);
+	if (record.inputAvailable || record.finalized) return;
+	record.inputAvailable = true;
+	record.stepIndex = args.ctx.stepIndex;
+	record.args = input;
 
-	const callId = meta.callId;
+	const callId = record.callId;
 	const callPartId = crypto.randomUUID();
-	const startTs = meta.startTs;
+	const safeInput = redactToolInput(args.base, input);
 
 	if (
 		args.markFirstToolCallReported() &&
@@ -114,9 +107,9 @@ export async function handleAdaptedToolInputAvailable(
 		index = await persistToolCall(args.ctx, {
 			partId: callPartId,
 			name: args.name,
-			input,
+			input: safeInput,
 			callId,
-			startTs,
+			startTs: record.startTs,
 			stepIndex: args.ctx.stepIndex,
 		});
 	} catch (error) {
@@ -135,7 +128,7 @@ export async function handleAdaptedToolInputAvailable(
 	}
 	publishToolCall(args.ctx, {
 		name: args.name,
-		input,
+		input: safeInput,
 		callId,
 		stepIndex: args.ctx.stepIndex,
 		index,
@@ -146,50 +139,6 @@ export async function handleAdaptedToolInputAvailable(
 			callId,
 			stepIndex: args.ctx.stepIndex,
 		});
-	}
-
-	if (args.name !== 'progress_update') {
-		if (
-			args.ctx.toolApprovalMode &&
-			requiresApproval(
-				args.name,
-				args.ctx.toolApprovalMode,
-				input,
-				getToolMetadata(args.base)?.effects,
-			)
-		) {
-			meta.approvalPromise = requestApproval(
-				args.ctx.sessionId,
-				args.ctx.messageId,
-				callId,
-				args.name,
-				input,
-				undefined,
-				args.ctx.projectRoot,
-			);
-		}
-		const guard = guardToolCall(args.name, input, {
-			projectRoot: args.ctx.projectRoot,
-			readOnlyRoots: args.ctx.readOnlyRoots,
-		});
-		if (guard.type === 'block') {
-			meta.blocked = true;
-			meta.blockReason = guard.reason;
-		} else if (
-			guard.type === 'approve' &&
-			!meta.approvalPromise &&
-			!skipsGuardApproval(args.ctx.toolApprovalMode)
-		) {
-			meta.approvalPromise = requestApproval(
-				args.ctx.sessionId,
-				args.ctx.messageId,
-				callId,
-				args.name,
-				input,
-				undefined,
-				args.ctx.projectRoot,
-			);
-		}
 	}
 
 	await callBaseInputHook(args.base, 'onInputAvailable', args.options);

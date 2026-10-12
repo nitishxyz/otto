@@ -7,6 +7,7 @@ import {
 } from '../../message/compaction.ts';
 import { resolveModel } from '../../provider/index.ts';
 import { adaptSimpleCall, detectOAuth } from '../../provider/oauth-adapter.ts';
+import { validateSummary } from '../../message/summary-validation.ts';
 import {
 	buildHandoffUserPrompt,
 	getHandoffSystemPrompt,
@@ -61,8 +62,12 @@ export async function prepareHandoffSummary(args: {
 	}
 
 	const normalized = normalizeHandoffSummary(summary);
-	if (normalized.length < 50) {
-		throw new Error('Failed to generate handoff summary');
+	const validation = validateSummary({
+		text: normalized,
+		finishReason: await result.finishReason,
+	});
+	if (!validation.ok) {
+		throw new Error(`Failed to generate handoff summary: ${validation.reason}`);
 	}
 	return normalized;
 }

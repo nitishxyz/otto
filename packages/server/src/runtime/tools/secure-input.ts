@@ -81,7 +81,9 @@ export function requestSecureInput(args: {
 	cacheTtlMs?: number;
 	bypassCache?: boolean;
 	timeoutMs?: number;
+	signal?: AbortSignal;
 }): Promise<string | null> {
+	if (args.signal?.aborted) return Promise.resolve(null);
 	const promptId = crypto.randomUUID();
 	const timeoutMs = args.timeoutMs ?? 120000;
 	const inputKind = args.inputKind ?? 'password';
@@ -97,6 +99,9 @@ export function requestSecureInput(args: {
 	if (cached !== undefined) return Promise.resolve(cached);
 
 	return new Promise((resolve) => {
+		const onAbort = () => {
+			resolveSecureInput(promptId, null, args.projectRoot);
+		};
 		const pending: PendingSecureInput = {
 			projectRoot: args.projectRoot,
 			promptId,
@@ -109,7 +114,11 @@ export function requestSecureInput(args: {
 			allowEmpty,
 			cacheKey,
 			cacheTtlMs: args.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS,
-			resolve,
+			resolve: (value) => {
+				if (pending.timeoutId) clearTimeout(pending.timeoutId);
+				args.signal?.removeEventListener('abort', onAbort);
+				resolve(value);
+			},
 			createdAt: Date.now(),
 		};
 
@@ -138,6 +147,7 @@ export function requestSecureInput(args: {
 			},
 		});
 
+		if (pendingSecureInputs.get(key) !== pending) return;
 		pending.timeoutId = setTimeout(() => {
 			if (!pendingSecureInputs.has(key)) return;
 			pendingSecureInputs.delete(key);
@@ -148,7 +158,7 @@ export function requestSecureInput(args: {
 				projectRoot: args.projectRoot,
 			});
 			if (pending.timeoutId) clearTimeout(pending.timeoutId);
-			resolve(null);
+			pending.resolve(null);
 			publish({
 				type: 'shell.secure_input.resolved',
 				sessionId: args.sessionId,
@@ -162,6 +172,8 @@ export function requestSecureInput(args: {
 				},
 			});
 		}, timeoutMs);
+		args.signal?.addEventListener('abort', onAbort, { once: true });
+		if (args.signal?.aborted) onAbort();
 	});
 }
 

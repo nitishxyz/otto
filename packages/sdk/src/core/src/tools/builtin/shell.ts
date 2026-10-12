@@ -1,10 +1,29 @@
 import { tool, type Tool } from 'ai';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { spawn } from 'node:child_process';
 import { z } from 'zod/v3';
+export { ShellOutputCollector, retainUtf8Tail } from '../shell/output.ts';
+import { ShellExecution } from '../shell/engine.ts';
+import { createPipeShellProcess } from '../shell/transport.ts';
+import {
+	formatShellResult,
+	type ShellExecutionResult as ShellResult,
+} from '../shell/result.ts';
+export { ShellExecution, type ShellOutcome } from '../shell/engine.ts';
+export {
+	createPipeShellProcess,
+	type ShellProcess,
+} from '../shell/transport.ts';
+export {
+	formatShellResult,
+	type ShellExecutionResult,
+} from '../shell/result.ts';
 import DESCRIPTION from './shell.txt' with { type: 'text' };
-import { getShellExecutionConfig, type ShellEnvMode } from '../bin-manager.ts';
-import { createToolError, type ToolResponse } from '../error.ts';
+import {
+	getShellExecutionConfigAsync,
+	type ShellEnvMode,
+} from '../bin-manager.ts';
+export { ShellExecutionState } from '../shell/lifecycle.ts';
+import { createToolError } from '../error.ts';
 import {
 	injectCoAuthorIntoGitCommit,
 	shouldCoAuthorCommits,
@@ -88,26 +107,6 @@ function resolveSafePath(
 		return abs;
 	}
 	throw new Error(`cwd escapes project root or is not read-only: ${p}`);
-}
-
-function killProcessTree(pid: number) {
-	try {
-		process.kill(-pid, 'SIGTERM');
-	} catch {
-		try {
-			process.kill(pid, 'SIGTERM');
-		} catch {}
-	}
-}
-
-function forceKillProcessTree(pid: number) {
-	try {
-		process.kill(-pid, 'SIGKILL');
-	} catch {
-		try {
-			process.kill(pid, 'SIGKILL');
-		} catch {}
-	}
 }
 
 const REDIRECTED_SEARCH_COMMANDS = new Set(['grep', 'egrep', 'fgrep', 'rg']);
@@ -199,40 +198,6 @@ export type ShellOutputMode = 'auto' | 'full' | 'tail';
 const DEFAULT_TAIL_LINES = 100;
 const DEFAULT_MAX_OUTPUT_BYTES = 128_000;
 
-type CompactTextResult = {
-	text: string;
-	truncated: boolean;
-	originalBytes: number;
-	shownBytes: number;
-};
-
-function compactTextByBytes(
-	text: string,
-	maxBytes: number,
-	label: string,
-): CompactTextResult {
-	const originalBytes = Buffer.byteLength(text, 'utf8');
-	if (maxBytes <= 0 || originalBytes <= maxBytes) {
-		return { text, truncated: false, originalBytes, shownBytes: originalBytes };
-	}
-
-	const marker = `\n… omitted ${originalBytes - maxBytes} bytes from ${label} …\n`;
-	const markerBytes = Buffer.byteLength(marker, 'utf8');
-	const budget = Math.max(0, maxBytes - markerBytes);
-	const headBytes = Math.floor(budget / 2);
-	const tailBytes = budget - headBytes;
-	const buffer = Buffer.from(text, 'utf8');
-	const compacted = `${buffer.subarray(0, headBytes).toString('utf8')}${marker}${buffer
-		.subarray(buffer.byteLength - tailBytes)
-		.toString('utf8')}`;
-	return {
-		text: compacted,
-		truncated: true,
-		originalBytes,
-		shownBytes: Buffer.byteLength(compacted, 'utf8'),
-	};
-}
-
 export function appendTailLines(
 	current: string,
 	text: string,
@@ -246,27 +211,6 @@ export function appendTailLines(
 	if (lines.length <= entriesToKeep) return combined;
 	return lines.slice(-entriesToKeep).join('\n');
 }
-
-type ShellResult = ToolResponse<{
-	exitCode?: number;
-	stdout?: string;
-	stderr?: string;
-	detached?: boolean;
-	jobId?: string;
-	status?: 'running';
-	outputMode?: ShellOutputMode;
-	tailLines?: number;
-	maxOutputBytes?: number;
-	stdoutTruncated?: boolean;
-	stdoutOriginalBytes?: number;
-	stdoutShownBytes?: number;
-	stderrTruncated?: boolean;
-	stderrOriginalBytes?: number;
-	stderrShownBytes?: number;
-	discoveryHint?: string;
-	envMode?: ShellEnvMode;
-	envHint?: string;
-}>;
 
 type ShellStreamChunk =
 	| {
@@ -410,281 +354,51 @@ export function buildShellTool(
 				) as AsyncIterable<ShellStreamChunk> | ShellResult;
 			}
 
-			const shellConfig = getShellExecutionConfig(finalCmd, { envMode });
-			const proc = spawn(shellConfig.command, shellConfig.args, {
-				cwd: absCwd,
-				stdio: ['ignore', 'pipe', 'pipe'],
-				env: shellConfig.env,
-				detached: true,
-			});
-
-			let stdout = '';
-			let stderr = '';
-			let didTimeout = false;
-			let didAbort = false;
-			let settled = false;
-			let terminating = false;
-			let done = false;
-			let timeoutId: ReturnType<typeof setTimeout> | null = null;
-			let killEscalationId: ReturnType<typeof setTimeout> | null = null;
-			let fallbackSettleId: ReturnType<typeof setTimeout> | null = null;
-			const queue: ShellStreamChunk[] = [];
-			let notify: (() => void) | null = null;
-
-			const wake = () => {
-				if (!notify) return;
-				notify();
-				notify = null;
-			};
-
-			const pushDelta = (text: string) => {
-				if (!text) return;
-				queue.push({ channel: 'output', delta: text });
-				wake();
-			};
-
-			const settle = (result: ShellResult) => {
-				if (settled) return;
-				settled = true;
-				if ('stdout' in result && 'stderr' in result) {
-					const stdoutCompact = compactTextByBytes(
-						result.stdout ?? '',
-						maxOutputBytes,
-						'shell stdout',
-					);
-					const stderrCompact = compactTextByBytes(
-						result.stderr ?? '',
-						maxOutputBytes,
-						'shell stderr',
-					);
-					result.stdout = stdoutCompact.text;
-					result.stderr = stderrCompact.text;
-					result.maxOutputBytes = maxOutputBytes;
-					if (stdoutCompact.truncated) {
-						result.stdoutTruncated = true;
-						result.stdoutOriginalBytes = stdoutCompact.originalBytes;
-						result.stdoutShownBytes = stdoutCompact.shownBytes;
-					}
-					if (stderrCompact.truncated) {
-						result.stderrTruncated = true;
-						result.stderrOriginalBytes = stderrCompact.originalBytes;
-						result.stderrShownBytes = stderrCompact.shownBytes;
-					}
-				} else if ('details' in result && result.details) {
-					const details = result.details;
-					for (const field of ['stdout', 'stderr'] as const) {
-						const value = details[field];
-						if (typeof value !== 'string') continue;
-						const compact = compactTextByBytes(
-							value,
-							maxOutputBytes,
-							`shell ${field}`,
-						);
-						details[field] = compact.text;
-						if (compact.truncated) {
-							details[`${field}Truncated`] = true;
-							details[`${field}OriginalBytes`] = compact.originalBytes;
-							details[`${field}ShownBytes`] = compact.shownBytes;
-						}
-					}
-					details.maxOutputBytes = maxOutputBytes;
-				}
-				if (timeoutId) clearTimeout(timeoutId);
-				if (killEscalationId) clearTimeout(killEscalationId);
-				if (fallbackSettleId) clearTimeout(fallbackSettleId);
-				if (abortSignal) {
-					abortSignal.removeEventListener('abort', onAbort);
-				}
-				queue.push({ result });
-				done = true;
-				wake();
-			};
-
-			const abortResult = () =>
-				createToolError(`Command aborted by user: ${cmd}`, 'abort', {
-					cmd,
-					stdout,
-					stderr,
-					envMode,
-					...(outputMode === 'tail' || outputMode === 'auto'
-						? { outputMode, tailLines, maxOutputBytes }
-						: { outputMode, maxOutputBytes }),
-				});
-
-			const timeoutResult = () =>
-				createToolError(
-					`Command timed out after ${timeout}ms: ${cmd}`,
-					'timeout',
-					{
-						parameter: 'timeout',
-						value: timeout,
-						stdout,
-						stderr,
-						envMode,
-						...(outputMode === 'tail' || outputMode === 'auto'
-							? { outputMode, tailLines, maxOutputBytes }
-							: { outputMode, maxOutputBytes }),
-						suggestion: 'Increase timeout or optimize the command',
-					},
-				);
-
-			const terminate = (fallbackResult: () => ShellResult) => {
-				if (terminating) return;
-				terminating = true;
-				if (proc.pid) {
-					killProcessTree(proc.pid);
-					killEscalationId = setTimeout(() => {
-						if (proc.pid) forceKillProcessTree(proc.pid);
-					}, 1000);
-				} else {
-					proc.kill('SIGTERM');
-				}
-				fallbackSettleId = setTimeout(() => {
-					settle(fallbackResult());
-				}, 2000);
-			};
-
-			const onAbort = () => {
-				if (settled) return;
-				didAbort = true;
-				terminate(abortResult);
-			};
-
-			if (abortSignal) {
-				abortSignal.addEventListener('abort', onAbort, { once: true });
-			}
-
-			if (timeout > 0) {
-				timeoutId = setTimeout(() => {
-					didTimeout = true;
-					terminate(timeoutResult);
-				}, timeout);
-			}
-
-			proc.stdout?.on('data', (chunk) => {
-				const text = chunk.toString();
-				stdout =
-					outputMode === 'tail' || outputMode === 'auto'
-						? appendTailLines(stdout, text, tailLines)
-						: `${stdout}${text}`;
-				pushDelta(text);
-			});
-
-			proc.stderr?.on('data', (chunk) => {
-				const text = chunk.toString();
-				stderr =
-					outputMode === 'tail' || outputMode === 'auto'
-						? appendTailLines(stderr, text, tailLines)
-						: `${stderr}${text}`;
-				pushDelta(text);
-			});
-
-			proc.on('close', (exitCode) => {
-				const resolvedExitCode = exitCode ?? 0;
-				const envHint = detectShellEnvHint({
-					stdout,
-					stderr,
-					exitCode: resolvedExitCode,
+			return (async function* (): AsyncGenerator<ShellStreamChunk> {
+				const shellConfig = await getShellExecutionConfigAsync(finalCmd, {
 					envMode,
 				});
-				if (didAbort) {
-					settle(
-						createToolError(`Command aborted by user: ${cmd}`, 'abort', {
-							cmd,
-							stdout,
-							stderr,
-							envMode,
-							...(outputMode === 'tail' || outputMode === 'auto'
-								? { outputMode, tailLines, maxOutputBytes }
-								: { outputMode, maxOutputBytes }),
-						}),
-					);
-					return;
-				}
-
-				if (didTimeout) {
-					settle(
-						createToolError(
-							`Command timed out after ${timeout}ms: ${cmd}`,
-							'timeout',
-							{
-								parameter: 'timeout',
-								value: timeout,
-								stdout,
-								stderr,
-								envMode,
-								...(outputMode === 'tail' || outputMode === 'auto'
-									? { outputMode, tailLines, maxOutputBytes }
-									: { outputMode, maxOutputBytes }),
-								suggestion: 'Increase timeout or optimize the command',
-							},
+				if (abortSignal?.aborted) {
+					yield {
+						result: createToolError(
+							'Command aborted before execution',
+							'abort',
+							{ cmd },
 						),
-					);
+					};
 					return;
 				}
-
-				if (resolvedExitCode !== 0 && !allowNonZeroExit) {
-					const errorDetail = stderr.trim() || stdout.trim() || '';
-					const errorMsg = `Command failed with exit code ${resolvedExitCode}${errorDetail ? `\n\n${errorDetail}` : ''}`;
-					settle(
-						createToolError(errorMsg, 'execution', {
-							exitCode: resolvedExitCode,
-							stdout,
-							stderr,
-							cmd,
-							envMode,
-							...(envHint ? { envHint } : {}),
-							...(outputMode === 'tail' || outputMode === 'auto'
-								? { outputMode, tailLines, maxOutputBytes }
-								: { outputMode, maxOutputBytes }),
-							suggestion: 'Check command syntax or use allowNonZeroExit: true',
-						}),
-					);
-					return;
-				}
-
-				const discoveryHint = repositoryDiscoveryHint(finalCmd);
-				settle({
-					ok: true,
-					exitCode: resolvedExitCode,
-					stdout,
-					stderr,
-					envMode,
-					...(discoveryHint ? { discoveryHint } : {}),
-					...(envHint ? { envHint } : {}),
-					...(outputMode === 'tail' || outputMode === 'auto'
-						? { outputMode, tailLines, maxOutputBytes }
-						: { outputMode, maxOutputBytes }),
-				});
-			});
-			proc.on('error', (err) => {
-				settle(
-					createToolError(
-						`Command execution failed: ${err.message}`,
-						'execution',
-						{
-							cmd,
-							originalError: err.message,
-						},
-					),
-				);
-			});
-
-			const stream = async function* (): AsyncGenerator<ShellStreamChunk> {
-				while (!done || queue.length > 0) {
-					if (queue.length === 0) {
-						await new Promise<void>((resolve) => {
-							notify = resolve;
+				const execution = new ShellExecution<ShellResult>({
+					spawn: () => {
+						const proc = createPipeShellProcess({
+							...shellConfig,
+							cwd: absCwd,
 						});
-					}
-					while (queue.length > 0) {
-						const chunk = queue.shift();
-						if (chunk) yield chunk;
-					}
-				}
-			};
-
-			return stream();
+						proc.destroyInput();
+						return proc;
+					},
+					timeout,
+					abortSignal,
+					outputMode,
+					tailLines,
+					maxOutputBytes,
+					format: (outcome) =>
+						formatShellResult(outcome, {
+							cmd,
+							timeout,
+							allowNonZeroExit,
+							envMode,
+							envHint: detectShellEnvHint({
+								...outcome,
+								exitCode: outcome.exitCode ?? 1,
+								envMode,
+							}),
+							discoveryHint: repositoryDiscoveryHint(finalCmd),
+						}),
+				});
+				execution.start();
+				yield* execution.stream();
+			})();
 		},
 	}) as unknown as Tool;
 	return { name: 'shell', tool: shell };

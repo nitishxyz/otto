@@ -1,9 +1,9 @@
 import { Database } from 'bun:sqlite';
+import { CACHE_USAGE_NORMALIZATION_MARKER } from '@ottocode/database/markers';
 import { mkdir, readdir } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import {
-	CACHE_USAGE_NORMALIZATION_MARKER,
 	getProjectsStateRoot,
 	resolveUsageProvider,
 	type ProviderId,

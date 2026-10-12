@@ -176,6 +176,7 @@ export default {
 	fetch: app.fetch,
 };
 
+/** Return the process singleton; this does not create an isolated runtime. */
 export function createApp() {
 	return app;
 }
@@ -186,6 +187,7 @@ export type StandaloneAppConfig = {
 	defaultAgent?: string;
 };
 
+/** Create HTTP routes backed by the shared process runtime, not an isolated instance. */
 export function createStandaloneApp(_config?: StandaloneAppConfig) {
 	const honoApp = createOpenAPIApp();
 	applyPrivateNetworkAccessHeaders(honoApp);
@@ -246,6 +248,7 @@ export type EmbeddedAppConfig = {
 	corsOrigins?: string[];
 };
 
+/** Create configured HTTP routes; project resources, queues, state and bus remain process-wide. */
 export function createEmbeddedApp(config: EmbeddedAppConfig = {}) {
 	const honoApp = createOpenAPIApp();
 	applyPrivateNetworkAccessHeaders(honoApp);

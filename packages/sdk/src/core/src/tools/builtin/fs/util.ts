@@ -1,28 +1,13 @@
 import { createHash } from 'node:crypto';
-import { resolve as resolvePath } from 'node:path';
 import { createTwoFilesPatch, diffLines } from 'diff';
+import { resolveProjectPath } from '../../policy/path-resolution.ts';
 
-function normalizeForComparison(value: string) {
-	const withForwardSlashes = value.replace(/\\/g, '/');
-	return process.platform === 'win32'
-		? withForwardSlashes.toLowerCase()
-		: withForwardSlashes;
-}
-
+/**
+ * Resolves a project-relative path and rejects targets that escape the
+ * project lexically or through symlinks. Returns the lexical absolute path.
+ */
 export function resolveSafePath(projectRoot: string, p: string) {
-	const root = resolvePath(projectRoot);
-	const target = resolvePath(root, p || '.');
-	const rootNorm = (() => {
-		const normalized = normalizeForComparison(root);
-		if (normalized === '/') return '/';
-		return normalized.replace(/[\\/]+$/, '');
-	})();
-	const targetNorm = normalizeForComparison(target);
-	const rootWithSlash = rootNorm === '/' ? '/' : `${rootNorm}/`;
-	const inProject =
-		targetNorm === rootNorm || targetNorm.startsWith(rootWithSlash);
-	if (!inProject) throw new Error(`Path escapes project root: ${p}`);
-	return target;
+	return resolveProjectPath(projectRoot, p);
 }
 
 export function expandTilde(p: string): string {

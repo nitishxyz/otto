@@ -14,6 +14,7 @@ import {
 	type MCPTransport,
 } from '@ottocode/sdk';
 import type { ForgeInput, ForgeScope } from './types.ts';
+import { redactMCPServerConfig, redactUrl } from './redact.ts';
 import {
 	completeMCPAuth,
 	getMCPAuthStatus,
@@ -77,7 +78,7 @@ function summarizeServer(
 		disabled: server.disabled ?? false,
 		...(server.command ? { command: server.command } : {}),
 		...(server.args?.length ? { args: server.args } : {}),
-		...(server.url ? { url: server.url } : {}),
+		...(server.url ? { url: redactUrl(server.url) } : {}),
 		connected: status?.connected ?? false,
 		tools: status?.tools ?? [],
 		...(status?.error ? { error: status.error } : {}),
@@ -242,7 +243,7 @@ export async function runForgeMCPAction(
 			changes: [
 				`${action === 'create' ? 'Add' : 'Update'} MCP server '${name}' in ${server.scope} config`,
 			],
-			preview: JSON.stringify(server, null, 2),
+			preview: JSON.stringify(redactMCPServerConfig(server), null, 2),
 		};
 		if (input.dryRun) return { ok: true, applied: false, plan };
 

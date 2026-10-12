@@ -1,6 +1,7 @@
 import {
 	parseSkillFile,
 	pluginManifestSchema,
+	pluginNameSchema,
 	syncPluginSkills,
 	type PluginManifest,
 } from '@ottocode/sdk';
@@ -20,6 +21,9 @@ type PluginCapabilityKind = 'recipe' | 'skill' | 'agent';
 function capabilityName(input: ForgeInput): string {
 	const name = input.name?.trim().toLowerCase();
 	if (!name) throw new Error('name is required');
+	if (!pluginNameSchema.safeParse(name).success) {
+		throw new Error(`Invalid capability name '${name}'`);
+	}
 	return name;
 }
 
@@ -106,6 +110,40 @@ function findEntry(
 	return manifest.agents?.find((item) => item.name === name);
 }
 
+type RawEntry = Record<string, unknown> & { name: string };
+
+function isRawEntry(value: unknown): value is RawEntry {
+	return (
+		Boolean(value) &&
+		typeof value === 'object' &&
+		!Array.isArray(value) &&
+		typeof (value as { name?: unknown }).name === 'string'
+	);
+}
+
+/**
+ * Builds the manifest entry for a create/update. Updates start from the
+ * existing raw manifest entry so metadata the caller did not mention
+ * (description, provider, model, tools, prompt, source, ...) is preserved.
+ */
+function buildCapabilityEntry(
+	kind: PluginCapabilityKind,
+	name: string,
+	relativePath: string,
+	input: ForgeInput,
+	existing: RawEntry | undefined,
+): RawEntry {
+	const entry: RawEntry = { ...(existing ?? {}), name, path: relativePath };
+	if (input.description !== undefined) entry.description = input.description;
+	if (kind === 'agent') {
+		if (input.provider !== undefined) entry.provider = input.provider;
+		if (input.model !== undefined) entry.model = input.model;
+		if (input.tools !== undefined) entry.tools = input.tools;
+		if (input.appendTools !== undefined) entry.appendTools = input.appendTools;
+	}
+	return entry;
+}
+
 export async function runForgePluginCapabilityAction(
 	projectRoot: string,
 	input: ForgeInput,
@@ -172,29 +210,15 @@ export async function runForgePluginCapabilityAction(
 	const rawManifest = JSON.parse(originalManifest) as Record<string, unknown>;
 	const key =
 		kind === 'recipe' ? 'recipes' : kind === 'skill' ? 'skills' : 'agents';
-	const entries: Array<Record<string, unknown> & { name: string }> = [
-		...((plugin.manifest[key] as
-			| Array<Record<string, unknown> & { name: string }>
-			| undefined) ?? []),
-	].filter((item) => item.name !== name);
+	const rawEntries = Array.isArray(rawManifest[key])
+		? (rawManifest[key] as unknown[]).filter(isRawEntry)
+		: [];
+	const existingRawEntry = rawEntries.find((item) => item.name === name);
+	const entries: RawEntry[] = rawEntries.filter((item) => item.name !== name);
 	if (action !== 'remove') {
-		if (kind === 'agent') {
-			entries.push({
-				name,
-				path: relativePath,
-				...(input.description ? { description: input.description } : {}),
-				...(input.provider ? { provider: input.provider } : {}),
-				...(input.model ? { model: input.model } : {}),
-				...(input.tools ? { tools: input.tools } : {}),
-				...(input.appendTools ? { appendTools: input.appendTools } : {}),
-			});
-		} else {
-			entries.push({
-				name,
-				path: relativePath,
-				...(input.description ? { description: input.description } : {}),
-			});
-		}
+		entries.push(
+			buildCapabilityEntry(kind, name, relativePath, input, existingRawEntry),
+		);
 	}
 	const nextManifest: Record<string, unknown> = { ...rawManifest };
 	if (entries.length) nextManifest[key] = entries;

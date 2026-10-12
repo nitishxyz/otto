@@ -1,5 +1,5 @@
 import type { FilePart, TextPart } from 'ai';
-import { preprocessFileMentionsForModel } from '../file-mentions.ts';
+import { stripPreloadedMentionMarkers } from '../file-mentions.ts';
 import type { MessagePartRow, MessageRow } from './types.ts';
 
 function formatAttachmentContext(args: {
@@ -34,16 +34,19 @@ export function findLatestUserImageMessageId(
 	return undefined;
 }
 
-export async function buildUserModelParts(args: {
+/**
+ * Projects stored user parts into model parts. Pure: file mentions use the
+ * snapshot persisted at dispatch and never touch the filesystem.
+ */
+export function buildUserModelParts(args: {
 	message: MessageRow;
 	parts: MessagePartRow[];
 	latestUserImageMessageId?: string;
-	projectRoot?: string;
-}): Promise<Array<TextPart | FilePart>> {
+}): Array<TextPart | FilePart> {
 	const userParts: Array<TextPart | FilePart> = [];
 	for (const part of args.parts) {
 		if (part.type === 'text') {
-			await appendTextPart(userParts, part, args.projectRoot);
+			appendTextPart(userParts, part);
 		} else if (part.type === 'image') {
 			appendImagePart(userParts, part, {
 				isLatestUserImageMessage:
@@ -59,28 +62,31 @@ export async function buildUserModelParts(args: {
 	return userParts;
 }
 
-async function appendTextPart(
+function appendTextPart(
 	userParts: Array<TextPart | FilePart>,
 	part: MessagePartRow,
-	projectRoot?: string,
 ) {
 	try {
 		const obj = JSON.parse(part.content ?? '{}') as {
 			text?: unknown;
 			preloadedFileMentions?: unknown;
+			mentionSnapshot?: { text?: unknown };
 		};
 		const text = String(obj.text ?? '');
 		if (!text) return;
-		const preprocessed = await preprocessFileMentionsForModel({
-			text,
-			projectRoot,
-			preloadedPaths: Array.isArray(obj.preloadedFileMentions)
-				? obj.preloadedFileMentions.filter(
-						(path): path is string => typeof path === 'string',
-					)
-				: undefined,
+		const snapshotText = obj.mentionSnapshot?.text;
+		const preloaded = Array.isArray(obj.preloadedFileMentions)
+			? obj.preloadedFileMentions.filter(
+					(path): path is string => typeof path === 'string',
+				)
+			: [];
+		userParts.push({
+			type: 'text',
+			text:
+				typeof snapshotText === 'string'
+					? snapshotText
+					: stripPreloadedMentionMarkers(text, preloaded),
 		});
-		userParts.push({ type: 'text', text: preprocessed.text });
 	} catch {}
 }
 

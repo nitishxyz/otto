@@ -18,7 +18,7 @@ pub struct TunnelDevice {
     pub local_api_url: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct MachineBootstrap {
     pub device_id: String,

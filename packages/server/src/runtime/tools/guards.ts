@@ -1,4 +1,13 @@
 import { resolve as resolvePath } from 'node:path';
+import { getTerminalExecutableInput } from '@ottocode/sdk/tools/builtin/terminal';
+import {
+	canonicalRoot,
+	isAbsolutePathLike,
+	isPathWithin,
+	resolvePolicyPath,
+	type ResolvedPath,
+} from '@ottocode/sdk/tools/builtin/fs';
+import { getToolPathFields, type ToolPathField } from './definitions.ts';
 
 export type GuardAction =
 	| { type: 'block'; reason: string }
@@ -8,8 +17,14 @@ export type GuardAction =
 export type GuardContext = {
 	projectRoot?: string;
 	readOnlyRoots?: string[];
+	/** Session working directory used for session-relative path fields. */
+	cwd?: string;
 };
 
+/**
+ * Evaluates a tool call against safety policy. Path fields are resolved to
+ * their canonical (symlink-resolved) targets before any check runs.
+ */
 export function guardToolCall(
 	toolName: string,
 	args: unknown,
@@ -23,40 +38,116 @@ export function guardToolCall(
 			return guardShellCommand(
 				String(a.cmd ?? ''),
 				context,
-				String(a.cwd ?? ''),
+				resolveGuardPath(toolName, a, 'cwd', context),
 			);
 		case 'terminal':
 			return guardTerminal(a, context);
 		case 'read':
+		case 'read_image':
 		case 'ls':
 		case 'tree':
 		case 'search':
-			return guardReadPath(
-				String(a.path ?? ''),
-				context.projectRoot,
-				context.readOnlyRoots,
-			);
+		case 'cd':
+			return guardReadPath(resolveGuardPath(toolName, a, 'path', context));
 		case 'write':
 		case 'edit':
 		case 'multiedit':
-			return guardWritePath(a, context.readOnlyRoots);
+			return guardWritePath(
+				resolveGuardPath(toolName, a, 'path', context) ??
+					resolveGuardPath(toolName, a, 'targetPath', context) ??
+					resolveGuardPath(toolName, a, 'filePath', context),
+				context.readOnlyRoots,
+			);
 		case 'copy_into':
-			return guardCopyIntoPath(a, context.projectRoot, context.readOnlyRoots);
+			return guardCopyIntoPath(a, context);
+		case 'copy_attachment_to_project':
+			return guardWritePath(
+				resolveGuardPath(toolName, a, 'targetPath', context),
+				context.readOnlyRoots,
+			);
 		default:
 			return { type: 'allow' };
 	}
 }
 
+/** A path as seen by guards: raw text plus canonical facts when known. */
+type GuardPath = {
+	raw: string;
+	resolved?: ResolvedPath;
+};
+
+function findPathField(
+	toolName: string,
+	args: Record<string, unknown>,
+	field: string,
+): ToolPathField {
+	return (
+		getToolPathFields(toolName, args).find(
+			(entry) => entry.field === field,
+		) ?? {
+			field,
+			access: 'read',
+			base: 'project',
+		}
+	);
+}
+
+function resolveGuardPath(
+	toolName: string,
+	args: Record<string, unknown>,
+	field: string,
+	context: GuardContext,
+): GuardPath | undefined {
+	const value = args[field];
+	const pathField = findPathField(toolName, args, field);
+	const raw = typeof value === 'string' ? value.trim() : '';
+	const useSession =
+		pathField.base === 'session' ||
+		(pathField.sessionDefault && (!raw || raw === '.'));
+	if (!raw && !(useSession && context.cwd)) return undefined;
+	const effective = !raw || (useSession && raw === '.') ? '.' : raw;
+	if (!context.projectRoot) {
+		// Without a project root only absolute targets can be canonicalized;
+		// relative targets are project-relative by tool contract.
+		if (!isAbsolutePathLike(effective)) return { raw: effective };
+		const resolved = resolvePolicyPath(effective, { projectRoot: '/' });
+		const readOnlyRoot = context.readOnlyRoots?.find((root) =>
+			isPathWithin(resolved.canonical, canonicalRoot(root)),
+		);
+		return {
+			raw: effective,
+			resolved: {
+				...resolved,
+				scope: readOnlyRoot ? 'read-only' : 'outside',
+				projectRelative: undefined,
+				readOnlyRoot,
+			},
+		};
+	}
+	return {
+		raw: effective,
+		resolved: resolvePolicyPath(
+			effective,
+			{
+				projectRoot: context.projectRoot,
+				cwd: useSession ? context.cwd : undefined,
+				readOnlyRoots: context.readOnlyRoots,
+			},
+			{ base: useSession ? 'session' : 'project' },
+		),
+	};
+}
+
 function guardShellCommand(
 	cmd: string,
 	context: GuardContext = {},
-	cwd = '',
+	cwd?: GuardPath,
 ): GuardAction {
 	const n = cmd.trim();
 	if (!n) return { type: 'allow' };
 	if (
 		(referencesReadOnlyRoot(n, context.readOnlyRoots) ||
-			isPathInAnyRoot(cwd, context.readOnlyRoots)) &&
+			isGuardPathInReadOnlyRoot(cwd, context.readOnlyRoots)) &&
 		!isReadOnlyProbe(n)
 	) {
 		return { type: 'block', reason: 'Reference directories are read-only' };
@@ -83,7 +174,7 @@ function checkBlockedCommand(cmd: string): string | null {
 function isRecursiveDeleteRoot(cmd: string): boolean {
 	if (!/\brm\b/.test(cmd)) return false;
 	if (!hasRecursiveFlag(cmd)) return false;
-	return /\s\/(\s*$|\s*\*|\s*;|\s*&|\s*\|)/.test(cmd);
+	return /\s['"]?\/['"]?(\s*$|\s*\*|\s*;|\s*&|\s*\|)/.test(cmd);
 }
 
 function isRecursiveDeleteHome(cmd: string): boolean {
@@ -134,16 +225,18 @@ function referencesReadOnlyRoot(
 	readOnlyRoots: string[] | undefined,
 ): boolean {
 	const normalizedCommand = normalizeForComparison(command);
-	return (readOnlyRoots ?? []).some((root) => {
-		const normalizedRoot = normalizeForComparison(resolvePath(root)).replace(
-			/[\\/]+$/,
-			'',
-		);
-		const index = normalizedCommand.indexOf(normalizedRoot);
-		if (index === -1) return false;
-		const next = normalizedCommand[index + normalizedRoot.length];
-		return next === undefined || /[\s/'"\\]/.test(next);
-	});
+	return (readOnlyRoots ?? []).some((root) =>
+		[resolvePath(root), canonicalRoot(root)].some((candidate) => {
+			const normalizedRoot = normalizeForComparison(candidate).replace(
+				/[\\/]+$/,
+				'',
+			);
+			const index = normalizedCommand.indexOf(normalizedRoot);
+			if (index === -1) return false;
+			const next = normalizedCommand[index + normalizedRoot.length];
+			return next === undefined || /[\s/'"\\]/.test(next);
+		}),
+	);
 }
 
 function isReadOnlyProbe(command: string): boolean {
@@ -186,14 +279,51 @@ function guardTerminal(
 	context: GuardContext,
 ): GuardAction {
 	const op = String(args.operation ?? '');
-	if (op === 'start' && typeof args.command === 'string') {
-		return guardShellCommand(
-			args.command,
-			context,
-			typeof args.cwd === 'string' ? args.cwd : '',
+	if (op === 'start') {
+		const command = getTerminalExecutableInput({
+			operation: op,
+			command: typeof args.command === 'string' ? args.command : undefined,
+			args: Array.isArray(args.args)
+				? args.args.filter((part): part is string => typeof part === 'string')
+				: undefined,
+			shell: typeof args.shell === 'boolean' ? args.shell : undefined,
+		});
+		const cwd = resolveGuardPath('terminal', args, 'cwd', context);
+		if (!command) {
+			return isGuardPathInReadOnlyRoot(cwd, context.readOnlyRoots)
+				? { type: 'block', reason: 'Reference directories are read-only' }
+				: { type: 'allow' };
+		}
+		return guardShellCommand(command, context, cwd);
+	}
+	if (op === 'write' && typeof args.input === 'string') {
+		const text = executableTerminalText(
+			getTerminalExecutableInput({ operation: op, input: args.input }) ?? '',
 		);
+		if (!text) return { type: 'allow' };
+		return guardShellCommand(text, context);
 	}
 	return { type: 'allow' };
+}
+
+// ANSI escape sequences (CSI, OSC, and two-byte escapes) and other C0
+// control characters are keystrokes, not executable text.
+const ANSI_ESCAPE_PATTERN =
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: matching terminal control input
+	/\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])/g;
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching terminal control input
+const CONTROL_CHAR_PATTERN = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g;
+
+/**
+ * Printable text from terminal `write` input with escape sequences and
+ * control characters removed; line breaks become command separators.
+ */
+function executableTerminalText(input: string): string {
+	return input
+		.replace(ANSI_ESCAPE_PATTERN, '')
+		.replace(CONTROL_CHAR_PATTERN, '')
+		.replace(/\r\n?/g, '\n')
+		.trim();
 }
 
 const BLOCKED_READ_PATHS: Array<{ pattern: RegExp; reason: string }> = [
@@ -220,61 +350,62 @@ function normalizeForComparison(value: string): string {
 		: withForwardSlashes;
 }
 
-function expandTilde(path: string): string {
-	const home = process.env.HOME || process.env.USERPROFILE || '';
-	if (!home) return path;
-	if (path === '~') return home;
-	if (path.startsWith('~/')) return `${home}/${path.slice(2)}`;
-	return path;
+function isGuardPathInReadOnlyRoot(
+	path: GuardPath | undefined,
+	readOnlyRoots: string[] | undefined,
+): boolean {
+	if (!path || !readOnlyRoots?.length) return false;
+	if (path.resolved) {
+		if (path.resolved.scope === 'read-only') return true;
+		if (path.resolved.scope === 'project') return false;
+		return readOnlyRoots.some((root) =>
+			isPathWithin(path.resolved?.canonical ?? '', canonicalRoot(root)),
+		);
+	}
+	return false;
 }
 
-function isAbsoluteLike(path: string): boolean {
-	return (
-		path.startsWith('/') || path.startsWith('~') || /^[A-Za-z]:[\\/]/.test(path)
-	);
+/**
+ * Forms of a path that sensitive-path patterns are matched against: the
+ * raw input, the canonical target's `~/` form, and the canonical path
+ * (with macOS `/private` aliases folded back).
+ */
+function patternCandidates(path: GuardPath): string[] {
+	const candidates = new Set<string>([path.raw]);
+	const resolved = path.resolved;
+	if (resolved) {
+		if (resolved.homeRelative) candidates.add(resolved.homeRelative);
+		const canonical = normalizeForComparison(resolved.canonical);
+		candidates.add(canonical);
+		if (canonical.startsWith('/private/')) {
+			candidates.add(canonical.slice('/private'.length));
+		}
+	}
+	return Array.from(candidates);
 }
 
-function isPathInRoot(path: string, rootPath?: string): boolean {
-	if (!rootPath || !isAbsoluteLike(path)) return false;
-	const root = resolvePath(rootPath);
-	const target = resolvePath(expandTilde(path));
-	const rootNorm = (() => {
-		const normalized = normalizeForComparison(root);
-		if (normalized === '/') return '/';
-		return normalized.replace(/[\\/]+$/, '');
-	})();
-	const targetNorm = normalizeForComparison(target);
-	const rootWithSlash = rootNorm === '/' ? '/' : `${rootNorm}/`;
-	return targetNorm === rootNorm || targetNorm.startsWith(rootWithSlash);
+function matchPattern(
+	path: GuardPath,
+	patterns: Array<{ pattern: RegExp; reason: string }>,
+): string | undefined {
+	const candidates = patternCandidates(path);
+	for (const { pattern, reason } of patterns) {
+		if (candidates.some((candidate) => pattern.test(candidate))) return reason;
+	}
+	return undefined;
 }
 
-function isPathInAnyRoot(path: string, roots: string[] | undefined): boolean {
-	return (
-		Boolean(path) && (roots ?? []).some((root) => isPathInRoot(path, root))
-	);
-}
+function guardReadPath(path: GuardPath | undefined): GuardAction {
+	if (!path?.raw) return { type: 'allow' };
 
-function guardReadPath(
-	path: string,
-	projectRoot?: string,
-	readOnlyRoots?: string[],
-): GuardAction {
-	if (!path) return { type: 'allow' };
-	const p = path.trim();
+	const blocked = matchPattern(path, BLOCKED_READ_PATHS);
+	if (blocked) return { type: 'block', reason: blocked };
+	const sensitive = matchPattern(path, SENSITIVE_READ_PATHS);
+	if (sensitive) return { type: 'approve', reason: sensitive };
 
-	for (const { pattern, reason } of BLOCKED_READ_PATHS) {
-		if (pattern.test(p)) return { type: 'block', reason };
-	}
-	for (const { pattern, reason } of SENSITIVE_READ_PATHS) {
-		if (pattern.test(p)) return { type: 'approve', reason };
-	}
-	if (isPathInRoot(p, projectRoot) || isPathInAnyRoot(p, readOnlyRoots)) {
-		return { type: 'allow' };
-	}
-	if (isAbsoluteLike(p)) {
-		return { type: 'approve', reason: 'Reading path outside project root' };
-	}
-	return { type: 'allow' };
+	if (!path.resolved) return { type: 'allow' };
+	if (path.resolved.scope !== 'outside') return { type: 'allow' };
+	return { type: 'approve', reason: 'Reading path outside project root' };
 }
 
 const SENSITIVE_WRITE_PATHS: Array<{ pattern: RegExp; reason: string }> = [
@@ -283,39 +414,42 @@ const SENSITIVE_WRITE_PATHS: Array<{ pattern: RegExp; reason: string }> = [
 ];
 
 function guardWritePath(
-	args: Record<string, unknown>,
+	path: GuardPath | undefined,
 	readOnlyRoots?: string[],
 ): GuardAction {
-	const path =
-		typeof args.path === 'string'
-			? args.path
-			: typeof args.targetPath === 'string'
-				? args.targetPath
-				: typeof args.filePath === 'string'
-					? args.filePath
-					: '';
-	if (!path) return { type: 'allow' };
-	const p = path.trim();
-	if (isPathInAnyRoot(p, readOnlyRoots)) {
+	if (!path?.raw) return { type: 'allow' };
+	if (isGuardPathInReadOnlyRoot(path, readOnlyRoots)) {
 		return { type: 'block', reason: 'Reference directories are read-only' };
 	}
 
+	const candidates = [path.raw];
+	if (path.resolved?.projectRelative) {
+		candidates.push(path.resolved.projectRelative);
+	}
+	if (path.resolved) {
+		candidates.push(normalizeForComparison(path.resolved.canonical));
+	}
 	for (const { pattern, reason } of SENSITIVE_WRITE_PATHS) {
-		if (pattern.test(p)) return { type: 'approve', reason };
+		if (candidates.some((candidate) => pattern.test(candidate))) {
+			return { type: 'approve', reason };
+		}
 	}
 	return { type: 'allow' };
 }
 
 function guardCopyIntoPath(
 	args: Record<string, unknown>,
-	projectRoot?: string,
-	readOnlyRoots?: string[],
+	context: GuardContext,
 ): GuardAction {
-	const writeGuard = guardWritePath(args, readOnlyRoots);
+	const writeGuard = guardWritePath(
+		resolveGuardPath('copy_into', args, 'targetPath', context),
+		context.readOnlyRoots,
+	);
 	if (writeGuard.type === 'block') return writeGuard;
 
-	const sourcePath = typeof args.sourcePath === 'string' ? args.sourcePath : '';
-	const readGuard = guardReadPath(sourcePath, projectRoot, readOnlyRoots);
+	const readGuard = guardReadPath(
+		resolveGuardPath('copy_into', args, 'sourcePath', context),
+	);
 	if (readGuard.type === 'block') return readGuard;
 	if (writeGuard.type === 'approve') return writeGuard;
 	if (readGuard.type === 'approve') return readGuard;

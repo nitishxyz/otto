@@ -37,7 +37,7 @@ export function registerSessionQueueStatusRoute(app: Hono) {
 			await sessionRepository(project.db, project.projectRoot).require(
 				sessionId,
 			);
-			return c.json(getSessionQueueState(sessionId));
+			return c.json(getSessionQueueState(sessionId, project.projectRoot));
 		},
 	);
 }

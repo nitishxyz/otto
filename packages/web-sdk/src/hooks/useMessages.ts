@@ -303,9 +303,14 @@ function createMessagePageQueryOptions(
 				),
 			);
 			const fresh = await apiClient.getMessagePage(sessionId, { limit });
-			const page = reconcileRefetchedPage(cachedData?.pages[0], fresh);
+			const currentData = normalizeMessagesInfiniteData(
+				queryClient.getQueryData<MessagesInfiniteData | Message[]>(
+					getMessagesQueryKey(sessionId),
+				),
+			);
+			const page = reconcileRefetchedPage(currentData?.pages[0], fresh);
 			// Only the newest page can hold optimistic sends.
-			const cached = flattenMessagePages(cachedData);
+			const cached = flattenMessagePages(currentData);
 			return { ...page, items: mergeOptimisticMessages(cached, page.items) };
 		},
 		initialPageParam: null as string | null,

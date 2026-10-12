@@ -1,4 +1,10 @@
-import { index, sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import {
+	index,
+	sqliteTable,
+	text,
+	integer,
+	uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 import { sessions } from './sessions.ts';
 
 export const messages = sqliteTable(
@@ -14,6 +20,9 @@ export const messages = sqliteTable(
 		provider: text('provider').notNull(),
 		model: text('model').notNull(),
 		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		// Per-session monotonic insertion order. Assigned by a database trigger
+		// when omitted on insert; history ordering uses it instead of createdAt.
+		sequence: integer('sequence'),
 		// Metadata
 		completedAt: integer('completed_at', { mode: 'number' }),
 		latencyMs: integer('latency_ms'),
@@ -35,5 +44,9 @@ export const messages = sqliteTable(
 	},
 	(table) => [
 		index('messages_session_created_idx').on(table.sessionId, table.createdAt),
+		uniqueIndex('messages_session_sequence_idx').on(
+			table.sessionId,
+			table.sequence,
+		),
 	],
 );

@@ -1,16 +1,12 @@
 import {
-	discoverSkills,
-	findGitRoot,
 	getGlobalConfigDir,
 	parseSkillFile,
-	resolveEffectivePlugins,
 	validateSkillName,
 } from '@ottocode/sdk';
-import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { readFile, stat } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import {
 	deleteAgentConfig,
-	getAllAgentDetails,
 	loadAgentConfigLayers,
 	upsertAgentConfig,
 	validateAgentName,
@@ -20,13 +16,13 @@ import {
 	getPromptFileTarget,
 } from '../agent/config/paths.ts';
 import {
-	discoverAllRecipes,
 	getRecipesDir,
 	isValidRecipeName,
 	parseRecipeContent,
 	validateRecipeNameForScope,
 } from '../commands/recipes.ts';
 import { getForgeDocs } from './docs.ts';
+import { atomicWriteForgeText, removeForgeDescendant } from './atomic-write.ts';
 import { getProjectToolCatalog } from '../tools/catalog.ts';
 import type {
 	ForgeInput,
@@ -36,14 +32,16 @@ import type {
 	ForgeScope,
 	ForgeTarget,
 } from './types.ts';
-import { listForgeMCPServers, runForgeMCPAction } from './mcp.ts';
-import { listForgeAuth, runForgeAuthAction } from './auth.ts';
-import { listForgeProviders, runForgeProviderAction } from './provider.ts';
+import { runForgeMCPAction } from './mcp.ts';
+import { runForgeAuthAction } from './auth.ts';
+import { runForgeProviderAction } from './provider.ts';
 import { runForgeTunnelAction } from './tunnel.ts';
 import { runForgePluginCommandAction } from './plugin-command.ts';
 import { runForgePluginAction } from './plugin.ts';
 import { runForgePluginToolAction } from './plugin-tool.ts';
 import { runForgePluginCapabilityAction } from './plugin-capability.ts';
+
+export { getForgeInventory } from './inventory.ts';
 
 function normalizeName(name: string | undefined): string {
 	return name?.trim().toLowerCase() ?? '';
@@ -236,18 +234,6 @@ function buildArtifactContent(
 	return requireContent(input, existingContent);
 }
 
-async function atomicWrite(path: string, content: string): Promise<void> {
-	await mkdir(dirname(path), { recursive: true });
-	const temporaryPath = `${path}.forge-${crypto.randomUUID()}.tmp`;
-	await writeFile(temporaryPath, content, 'utf8');
-	try {
-		await rename(temporaryPath, path);
-	} catch (error) {
-		await rm(temporaryPath, { force: true });
-		throw error;
-	}
-}
-
 function mutationForPlan(input: ForgeInput): ForgeMutation {
 	if (input.action === 'plan') {
 		if (!input.targetAction)
@@ -339,9 +325,9 @@ async function applyAgentMutation(
 	const scope = plan.target.scope === 'project' ? 'local' : 'global';
 	if (plan.action === 'remove') {
 		await deleteAgentConfig({ projectRoot, name: plan.target.name, scope });
-		await rm(dirname(plan.target.paths[1] as string), {
+		const agentDir = dirname(plan.target.paths[1] as string);
+		await removeForgeDescendant(dirname(agentDir), agentDir, {
 			recursive: true,
-			force: true,
 		});
 		return;
 	}
@@ -496,146 +482,21 @@ export async function runForgeMutation(
 		await applyAgentMutation(projectRoot, input, plan);
 	} else if (plan.action === 'remove') {
 		const path = plan.target.paths[0] as string;
-		await rm(plan.target.kind === 'skill' ? dirname(path) : path, {
-			recursive: plan.target.kind === 'skill',
-			force: true,
-		});
+		if (plan.target.kind === 'skill') {
+			await removeForgeDescendant(dirname(dirname(path)), dirname(path), {
+				recursive: true,
+			});
+		} else {
+			await removeForgeDescendant(dirname(path), path);
+		}
 	} else {
-		await atomicWrite(plan.target.paths[0] as string, plan.preview as string);
+		await atomicWriteForgeText(
+			plan.target.paths[0] as string,
+			plan.preview as string,
+		);
 	}
 
 	return { ok: true, applied: true, plan };
-}
-
-export async function getForgeInventory(projectRoot: string) {
-	const repoRoot = (await findGitRoot(projectRoot)) ?? projectRoot;
-	const [
-		recipes,
-		skills,
-		agentDetails,
-		effectivePlugins,
-		mcpServers,
-		providers,
-		auth,
-		tunnel,
-	] = await Promise.all([
-		discoverAllRecipes(projectRoot),
-		discoverSkills(projectRoot, repoRoot),
-		getAllAgentDetails(projectRoot),
-		resolveEffectivePlugins(projectRoot),
-		listForgeMCPServers(projectRoot),
-		listForgeProviders(projectRoot),
-		listForgeAuth(projectRoot),
-		runForgeTunnelAction({ action: 'status', kind: 'tunnel' }),
-	]);
-	const installedPlugins = effectivePlugins.plugins.filter(
-		(plugin) => plugin.status === 'installed' && plugin.manifest,
-	);
-	const recipeOwners = new Map<string, string>();
-	const skillOwners = new Map<string, string>();
-	const agentOwners = new Map<string, string>();
-	for (const plugin of installedPlugins) {
-		for (const recipe of plugin.manifest?.recipes ?? []) {
-			recipeOwners.set(resolve(plugin.dir, recipe.path), plugin.name);
-		}
-		for (const skill of plugin.manifest?.skills ?? []) {
-			skillOwners.set(skill.name.toLowerCase(), plugin.name);
-		}
-		for (const agent of plugin.manifest?.agents ?? []) {
-			agentOwners.set(agent.name.toLowerCase(), plugin.name);
-		}
-	}
-
-	return {
-		projectRoot,
-		recipes: recipes.map((recipe) => ({
-			name: recipe.name,
-			scope: recipe.scope,
-			description: recipe.description,
-			path: recipe.path,
-			source: recipeOwners.has(resolve(recipe.path)) ? 'plugin' : 'standalone',
-			plugin: recipeOwners.get(resolve(recipe.path)),
-			mutable: true,
-		})),
-		skills: skills.map((skill) => ({
-			name: skill.name,
-			scope: skill.scope,
-			description: skill.description,
-			path: skill.path,
-			source: skillOwners.has(skill.name) ? 'plugin' : 'standalone',
-			plugin: skillOwners.get(skill.name),
-			mutable: true,
-		})),
-		agents: agentDetails.agents.map((agent) => ({
-			name: agent.name,
-			source: agent.source,
-			description: agent.description ?? agent.defaultDescription,
-			provider: agent.provider,
-			model: agent.model,
-			hasProjectOverride: agent.hasLocalOverride,
-			hasGlobalOverride: agent.hasGlobalOverride,
-			plugin: agentOwners.get(agent.name),
-			mutable: true,
-		})),
-		mcpServers,
-		providers,
-		auth,
-		tunnel: tunnel.tunnel,
-		plugins: effectivePlugins.plugins.map((plugin) => ({
-			name: plugin.name,
-			scope: plugin.scope,
-			dir: plugin.dir,
-			manifestPath: plugin.manifestPath,
-			enabled: plugin.enabled,
-			installed: plugin.installed,
-			status: plugin.status,
-			source: plugin.configEntry?.source,
-			mutable:
-				!plugin.configEntry?.source?.startsWith('official:') &&
-				!plugin.configEntry?.source?.startsWith('registry:'),
-			version: plugin.manifest?.version,
-			description: plugin.manifest?.description,
-			capabilities: {
-				recipes: plugin.manifest?.recipes?.length ?? 0,
-				skills: plugin.manifest?.skills?.length ?? 0,
-				agents: plugin.manifest?.agents?.length ?? 0,
-				commands: Object.keys(plugin.manifest?.commands ?? {}).length,
-				tools: plugin.manifest?.tools?.length ?? 0,
-				mcpServers: Object.keys(plugin.manifest?.mcpServers ?? {}).length,
-			},
-			commands: Object.entries(plugin.manifest?.commands ?? {}).map(
-				([name, command]) => ({
-					name,
-					label: command.label,
-					description: command.description,
-					parameters: command.parameters,
-				}),
-			),
-			recipes: (plugin.manifest?.recipes ?? []).map((recipe) => ({
-				name: recipe.name,
-				path: recipe.path,
-				description: recipe.description,
-			})),
-			skills: (plugin.manifest?.skills ?? []).map((skill) => ({
-				name: skill.name,
-				path: skill.path,
-				description: skill.description,
-			})),
-			agents: (plugin.manifest?.agents ?? []).map((agent) => ({
-				name: agent.name,
-				path: agent.path,
-				description: agent.description,
-			})),
-			tools: (plugin.manifest?.tools ?? []).map((tool) => ({
-				name: tool.name,
-				fullName: `${plugin.name}__${tool.name}`,
-				description: tool.description,
-				entry: tool.entry,
-				effects: tool.effects,
-				timeoutMs: tool.timeoutMs,
-			})),
-		})),
-	};
 }
 
 export async function readForgeArtifact(path: string): Promise<string | null> {

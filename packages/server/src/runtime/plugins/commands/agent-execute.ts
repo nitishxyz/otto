@@ -3,12 +3,9 @@ import { APIError } from '../../errors/api-error.ts';
 import { getProjectManager } from '../../projects/manager.ts';
 import {
 	createServerTerminalBridge,
-	formatRenderedCommand,
-	runPluginCommand,
+	executePreparedPluginCommand,
+	preparePluginCommand,
 } from './execute.ts';
-import { normalizePluginCommandRunInput } from './parse.ts';
-import { renderPluginCommand } from './render.ts';
-import { resolvePluginCommand } from './resolve.ts';
 
 export type AgentPluginCommandInput = {
 	plugin: string;
@@ -17,6 +14,8 @@ export type AgentPluginCommandInput = {
 	argsText?: string;
 	extraArgs?: string[];
 };
+
+const FALLBACK_POLICY = 'Automatic fallback execution is not supported yet.';
 
 export async function executePluginCommandForAgent(
 	projectRoot: string,
@@ -27,48 +26,32 @@ export async function executePluginCommandForAgent(
 		(await getProjectManager().getProject({ path: projectRoot }))
 			.terminalManager;
 	const bridge = createServerTerminalBridge(terminalManager);
-	const resolved = await resolvePluginCommand(
+	const result = await preparePluginCommand({
 		projectRoot,
-		input.plugin,
-		input.command,
-	);
-	if (!resolved) {
-		return {
-			ok: false,
-			error: `Plugin command not found or plugin disabled: /${input.plugin} ${input.command}`,
-			code: 'plugin_command_not_found',
-		};
-	}
-
-	const parsed = normalizePluginCommandRunInput(resolved.definition, {
+		plugin: input.plugin,
+		command: input.command,
 		argsText: input.argsText,
 		args: input.args,
 		extraArgs: input.extraArgs,
 	});
-	if (!parsed.ok) {
+	if (!result.ok) {
 		return {
 			ok: false,
-			error: parsed.error,
-			code: 'plugin_command_invalid_args',
+			error:
+				result.code === 'plugin_command_not_found'
+					? `Plugin command not found or plugin disabled: /${input.plugin} ${input.command}`
+					: result.error,
+			code: result.code,
 		};
 	}
-
-	const rendered = renderPluginCommand(resolved.definition, parsed.values, {
-		pluginDir: resolved.plugin.dir,
-		extraArgs: parsed.extraArgs,
-	});
-	if (!rendered.ok) {
-		return {
-			ok: false,
-			error: rendered.error,
-			code: 'plugin_command_render_error',
-		};
-	}
-
-	const renderedCommand = formatRenderedCommand(rendered.primary);
-	const fallbackCommand = rendered.fallback
-		? formatRenderedCommand(rendered.fallback)
-		: undefined;
+	const { prepared } = result;
+	const renderedCommand = prepared.command;
+	const fallback = prepared.fallbackCommand
+		? {
+				fallbackCommand: prepared.fallbackCommand,
+				fallbackPolicy: FALLBACK_POLICY,
+			}
+		: {};
 
 	if (!bridge.isAvailable()) {
 		return {
@@ -76,42 +59,20 @@ export async function executePluginCommandForAgent(
 			error: 'Plugin command terminal execution is unavailable',
 			code: 'plugin_command_terminal_unavailable',
 			renderedCommand,
-			...(fallbackCommand
-				? {
-						fallbackCommand,
-						fallbackPolicy:
-							'Automatic fallback execution is not supported yet.',
-					}
-				: {}),
+			...fallback,
 		};
 	}
 
 	try {
-		const result = await runPluginCommand(
-			{
-				projectRoot,
-				plugin: input.plugin,
-				command: input.command,
-				argsText: input.argsText,
-				args: input.args,
-				extraArgs: input.extraArgs,
-			},
-			bridge,
-		);
+		const started = executePreparedPluginCommand(prepared, bridge);
 		return {
 			ok: true,
-			renderedCommand: result.command,
-			terminalId: result.terminalId,
-			title: result.title,
-			...(result.previewUrl ? { previewUrl: result.previewUrl } : {}),
-			execution: result.execution,
-			...(fallbackCommand
-				? {
-						fallbackCommand,
-						fallbackPolicy:
-							'Automatic fallback execution is not supported yet.',
-					}
-				: {}),
+			renderedCommand: started.command,
+			terminalId: started.terminalId,
+			title: started.title,
+			...(started.previewUrl ? { previewUrl: started.previewUrl } : {}),
+			execution: started.execution,
+			...fallback,
 		};
 	} catch (error) {
 		if (error instanceof APIError) {
@@ -121,7 +82,9 @@ export async function executePluginCommandForAgent(
 				code: error.code,
 				renderedCommand,
 				...(error.details ?? {}),
-				...(fallbackCommand ? { fallbackCommand } : {}),
+				...(prepared.fallbackCommand
+					? { fallbackCommand: prepared.fallbackCommand }
+					: {}),
 			};
 		}
 		throw error;

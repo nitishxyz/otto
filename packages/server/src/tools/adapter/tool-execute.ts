@@ -1,10 +1,17 @@
 import type { Tool } from 'ai';
 import { logger } from '@ottocode/sdk';
-import { isToolError } from '@ottocode/sdk/tools/error';
+import {
+	createToolError,
+	normalizeToolOutcome,
+	ToolResultDurabilityError,
+	type ToolOutcome,
+} from '@ottocode/sdk/tools/error';
 import type {
 	StepExecutionState,
 	ToolAdapterContext,
 } from '../../runtime/tools/context.ts';
+import { createApprovalRequest } from '../../runtime/tools/approval.ts';
+import { requestSecureInput } from '../../runtime/tools/secure-input.ts';
 import { consumeToolStream, executeBaseTool } from './execution.ts';
 import {
 	logToolResult,
@@ -13,27 +20,41 @@ import {
 } from './events.ts';
 import {
 	computeToolTiming,
-	persistToolErrorResult,
 	persistToolResultWithIndex,
 	updateToolSessionStats,
 } from './persistence.ts';
 import {
+	ensureToolCallRecord,
 	extractToolCallId,
-	shiftPendingCall,
-	type PendingCallMeta,
+	type ToolCallRecord,
+	type ToolCallRecords,
 } from './pending.ts';
+import { prepareToolCall } from './prepare.ts';
+import {
+	clearToolJournal,
+	journalToolIntent,
+	journalToolOutcome,
+	toolRestartRecovery,
+} from './finalization-journal.ts';
 import {
 	buildToolResultContent,
 	createAbortedToolResult,
 	createBlockedToolResult,
 	createRejectedToolResult,
 	createToolExceptionResult,
+	createUnjournaledToolResult,
 	markToolFailed,
 	markToolSucceeded,
 	type ToolFailureState,
 } from './results.ts';
 import { unwrapDoubleWrappedArgs } from './model-output.ts';
 import { referenceBrowserScreenshot } from './browser-artifact.ts';
+import {
+	createToolOutputRedactor,
+	getSensitiveInputs,
+	redactToolInput,
+	suppressesInputDeltas,
+} from './sensitive.ts';
 
 type ToolExecuteSignature = Tool['execute'] extends (
 	input: infer Input,
@@ -47,259 +68,329 @@ export type ToolExecuteOptions = ToolExecuteSignature['options'] extends never
 	: ToolExecuteSignature['options'];
 type ToolExecuteReturn = ToolExecuteSignature['result'];
 
-export async function handleAdaptedToolExecute(args: {
+type ExecuteArgs = {
 	base: Tool;
 	ctx: ToolAdapterContext;
-	pendingCalls: Map<string, PendingCallMeta[]>;
+	records: ToolCallRecords;
 	name: string;
 	input: ToolExecuteInput;
 	options: ToolExecuteOptions;
 	stepStates: Map<number, StepExecutionState>;
 	failureState: ToolFailureState;
-	processedToolErrors: WeakSet<object>;
-}): Promise<ToolExecuteReturn> {
-	const input = unwrapDoubleWrappedArgs(args.input, args.name);
-	const sdkCallId = extractToolCallId(args.options);
-	const abortSignal = (
-		args.options as { abortSignal?: AbortSignal } | undefined
-	)?.abortSignal;
-	const meta = shiftPendingCall(args.pendingCalls, args.name);
-	const callIdFromQueue = sdkCallId || meta?.callId;
-	const startTsFromQueue = meta?.startTs;
-	const stepIndexForEvent = meta?.stepIndex ?? args.ctx.stepIndex;
+};
 
+function getStepState(
+	stepStates: Map<number, StepExecutionState>,
+	stepIndex: number | undefined,
+): StepExecutionState {
 	const stepKey =
-		typeof stepIndexForEvent === 'number' && Number.isFinite(stepIndexForEvent)
-			? stepIndexForEvent
-			: 0;
-	let stepState = args.stepStates.get(stepKey);
+		typeof stepIndex === 'number' && Number.isFinite(stepIndex) ? stepIndex : 0;
+	let stepState = stepStates.get(stepKey);
 	if (!stepState) {
 		stepState = {
 			chain: Promise.resolve(),
 			failed: false,
 			failedToolName: undefined,
 		};
-		args.stepStates.set(stepKey, stepState);
+		stepStates.set(stepKey, stepState);
 	}
+	return stepState;
+}
 
-	const executeWithGuards = async (): Promise<ToolExecuteReturn> => {
-		try {
-			if (abortSignal?.aborted) {
-				const abortedResult = createAbortedToolResult();
-				await persistToolErrorResult(args.ctx, {
-					name: args.name,
-					errorResult: abortedResult,
-					callId: callIdFromQueue,
-					startTs: startTsFromQueue,
-					stepIndexForEvent,
-					input: meta?.args,
-				});
-				return abortedResult as ToolExecuteReturn;
-			}
+/**
+ * Executes one tool call identified by its SDK `toolCallId`, then finalizes
+ * it exactly once. Calls within a step run sequentially.
+ */
+export async function handleAdaptedToolExecute(
+	args: ExecuteArgs,
+): Promise<ToolExecuteReturn> {
+	const input = unwrapDoubleWrappedArgs(args.input, args.name);
+	const record = ensureToolCallRecord(args.records, {
+		callId: extractToolCallId(args.options),
+		name: args.name,
+		stepIndex: args.ctx.stepIndex,
+	});
+	if (record.execution) return record.execution as Promise<ToolExecuteReturn>;
+	if (record.args === undefined) record.args = input;
+	const stepIndex = record.stepIndex ?? args.ctx.stepIndex;
+	const stepState = getStepState(args.stepStates, stepIndex);
 
-			if (meta?.blocked) {
-				const blockedResult = createBlockedToolResult(meta.blockReason);
-				await persistToolErrorResult(args.ctx, {
-					name: args.name,
-					errorResult: blockedResult,
-					callId: callIdFromQueue,
-					startTs: startTsFromQueue,
-					stepIndexForEvent,
-					input: meta?.args,
-				});
-				return blockedResult as ToolExecuteReturn;
-			}
-
-			if (meta?.approvalPromise) {
-				const approved = await meta.approvalPromise;
-				if (abortSignal?.aborted) {
-					const abortedResult = createAbortedToolResult();
-					await persistToolErrorResult(args.ctx, {
-						name: args.name,
-						errorResult: abortedResult,
-						callId: callIdFromQueue,
-						startTs: startTsFromQueue,
-						stepIndexForEvent,
-						input: meta?.args,
-					});
-					return abortedResult as ToolExecuteReturn;
-				}
-				if (!approved) {
-					const rejectedResult = createRejectedToolResult();
-					await persistToolErrorResult(args.ctx, {
-						name: args.name,
-						errorResult: rejectedResult,
-						callId: callIdFromQueue,
-						startTs: startTsFromQueue,
-						stepIndexForEvent,
-						input: meta?.args,
-					});
-					return rejectedResult as ToolExecuteReturn;
-				}
-			}
-
-			const res = executeBaseTool(args.ctx, {
-				base: args.base,
-				name: args.name,
-				input,
-				options: args.options,
-				callId: callIdFromQueue,
-			});
-			let result: unknown = res;
-			if (res && typeof res === 'object' && Symbol.asyncIterator in res) {
-				result = await consumeToolStream(args.ctx, {
-					stream: res as AsyncIterable<unknown>,
-					name: args.name,
-					stepIndex: stepIndexForEvent,
-					callId: callIdFromQueue,
-				});
-			} else {
-				result = await Promise.resolve(res as ToolExecuteReturn);
-			}
-
-			if (isToolError(result)) {
-				markToolFailed(stepState, args.failureState, args.name);
-				await persistToolErrorResult(args.ctx, {
-					name: args.name,
-					errorResult: result,
-					callId: callIdFromQueue,
-					startTs: startTsFromQueue,
-					stepIndexForEvent,
-					input: meta?.args,
-				});
-				args.processedToolErrors.add(result as object);
-				return result as ToolExecuteReturn;
-			}
-
-			const resultPartId = crypto.randomUUID();
-			const callId = callIdFromQueue;
-			const startTs = startTsFromQueue;
-			const contentObj = buildToolResultContent({
-				name: args.name,
-				result,
-				callId,
-				input: meta?.args,
-			});
-
-			const index = await args.ctx.nextIndex();
-			const { endTs, durationMs } = computeToolTiming(startTs);
-
-			if (args.name === 'progress_update') {
-				markToolSucceeded(stepState, args.failureState, args.name);
-				publishToolResult(args.ctx, contentObj, stepIndexForEvent);
-				void persistProgressUpdateResult({
-					ctx: args.ctx,
-					partId: resultPartId,
-					index,
-					name: args.name,
-					content: contentObj,
-					startTs,
-					callId,
-					stepIndex: stepIndexForEvent,
-					endTs,
-					durationMs,
-				});
-				return result as ToolExecuteReturn;
-			}
-
-			markToolSucceeded(stepState, args.failureState, args.name);
-			await persistToolResultWithIndex(args.ctx, {
-				partId: resultPartId,
-				index,
-				name: args.name,
-				content: contentObj,
-				startTs,
-				callId,
-				stepIndex: stepIndexForEvent,
-				endTs,
-				durationMs,
-			});
-			await updateToolSessionStats(args.ctx, {
-				name: args.name,
-				durationMs,
-				endTs,
-			});
-			const eventContent =
-				args.name === 'browser' && callId
-					? referenceBrowserScreenshot(contentObj, args.ctx.sessionId, callId)
-					: contentObj;
-			publishToolResult(args.ctx, eventContent, stepIndexForEvent);
-			logToolResult(args.ctx, {
-				name: args.name,
-				callId,
-				stepIndex: stepIndexForEvent,
-			});
-			if (args.name === 'update_todos') {
-				publishPlanUpdated(args.ctx, contentObj.result, contentObj.args);
-			}
-			return result as ToolExecuteReturn;
-		} catch (error) {
-			markToolFailed(stepState, args.failureState, args.name);
-
-			if (isToolError(error) && args.processedToolErrors.has(error as object)) {
-				throw error;
-			}
-
-			const errorResult = isToolError(error)
-				? error
-				: createToolExceptionResult(error);
-
-			await persistToolErrorResult(args.ctx, {
-				name: args.name,
-				errorResult,
-				callId: callIdFromQueue,
-				startTs: startTsFromQueue,
-				stepIndexForEvent,
-				input: meta?.args,
-			});
-
-			if (isToolError(error)) {
-				args.processedToolErrors.add(error as object);
-			}
-
-			return errorResult as ToolExecuteReturn;
-		}
+	const run = async (): Promise<ToolExecuteReturn> => {
+		const outcome =
+			record.outcome ?? (await executeToolCall(args, record, input));
+		record.outcome = outcome;
+		await finalizeToolCall(args, record, outcome, stepState, stepIndex);
+		return outcome.result as ToolExecuteReturn;
 	};
 
-	const queued = stepState.chain
-		.catch(() => undefined)
-		.then(() => executeWithGuards());
+	const queued = stepState.chain.catch(() => undefined).then(run);
+	record.execution = queued;
 	stepState.chain = queued.then(
 		() => undefined,
-		() => undefined,
+		() => {
+			record.execution = undefined;
+		},
 	);
 	return queued;
 }
 
-async function persistProgressUpdateResult(args: {
-	ctx: ToolAdapterContext;
-	partId: string;
-	index: number;
-	name: string;
-	content: ReturnType<typeof buildToolResultContent>;
-	startTs: number | undefined;
-	callId: string | undefined;
-	stepIndex: number | undefined;
-	endTs: number;
-	durationMs: number | null;
-}) {
+function getAbortSignal(options: unknown): AbortSignal | undefined {
+	return (options as { abortSignal?: AbortSignal } | undefined)?.abortSignal;
+}
+
+/**
+ * Produces the call's typed outcome. Never throws: tool exceptions become
+ * `error` outcomes; nothing here persists or publishes results.
+ */
+async function executeToolCall(
+	args: ExecuteArgs,
+	record: ToolCallRecord,
+	input: unknown,
+): Promise<ToolOutcome> {
+	const abortSignal = getAbortSignal(args.options);
+	let redactOutput = createToolOutputRedactor(args.base, input);
+	const aborted = (): ToolOutcome => ({
+		status: 'aborted',
+		result: createAbortedToolResult(),
+	});
 	try {
-		await persistToolResultWithIndex(args.ctx, {
-			partId: args.partId,
-			index: args.index,
+		if (abortSignal?.aborted) return aborted();
+
+		const prepared = await prepareToolCall({
+			base: args.base,
+			ctx: args.ctx,
 			name: args.name,
-			content: args.content,
-			startTs: args.startTs,
-			callId: args.callId,
-			stepIndex: args.stepIndex,
-			endTs: args.endTs,
-			durationMs: args.durationMs,
+			input,
 		});
+		if (prepared.kind === 'invalid') {
+			const result = createToolError(prepared.error, 'validation');
+			return { status: 'error', result, error: prepared.error };
+		}
+		if (prepared.kind === 'blocked') {
+			return {
+				status: 'blocked',
+				result: createBlockedToolResult(prepared.reason),
+				reason: prepared.reason,
+			};
+		}
+
+		if (prepared.needsApproval) {
+			const approval = createApprovalRequest({
+				sessionId: args.ctx.sessionId,
+				messageId: args.ctx.messageId,
+				callId: record.callId,
+				toolName: args.name,
+				args: redactToolInput(args.base, prepared.executionArgs),
+				projectRoot: args.ctx.projectRoot,
+				signal: abortSignal,
+			});
+			const approved = await approval.promise;
+			if (abortSignal?.aborted) return aborted();
+			if (!approved) {
+				return { status: 'rejected', result: createRejectedToolResult() };
+			}
+		}
+
+		const executionArgs = await collectSecureInputs(
+			args,
+			record,
+			prepared.executionArgs,
+		);
+		if (abortSignal?.aborted) return aborted();
+		if (executionArgs === null) {
+			if (abortSignal?.aborted) return aborted();
+			return { status: 'rejected', result: createRejectedToolResult() };
+		}
+		redactOutput = createToolOutputRedactor(args.base, executionArgs);
+
+		if (!(await journalToolIntent(args.ctx, record))) {
+			const result = createUnjournaledToolResult();
+			return { status: 'error', result, error: result.error };
+		}
+		const res = await executeBaseTool(args.ctx, {
+			base: args.base,
+			name: args.name,
+			input: executionArgs as ToolExecuteInput,
+			options: args.options,
+			callId: record.callId,
+		});
+		const result =
+			res && typeof res === 'object' && Symbol.asyncIterator in res
+				? await consumeToolStream(args.ctx, {
+						stream: res as AsyncIterable<unknown>,
+						name: args.name,
+						stepIndex: record.stepIndex ?? args.ctx.stepIndex,
+						callId: record.callId,
+						suppressDeltas: suppressesInputDeltas(args.base),
+					})
+				: res;
+		return normalizeToolOutcome(redactOutput(result));
 	} catch (error) {
-		logger.debug('[tool] failed to persist progress_update result', {
+		if (abortSignal?.aborted) return aborted();
+		const result = redactOutput(createToolExceptionResult(error));
+		const outcome = normalizeToolOutcome(result);
+		return outcome.status === 'success'
+			? {
+					status: 'error',
+					result,
+					error: error instanceof Error ? error.message : String(error),
+				}
+			: outcome;
+	}
+}
+
+/**
+ * Asks the user for declared secret inputs the model did not supply.
+ * Returns null when the user declined or the request timed out.
+ */
+async function collectSecureInputs(
+	args: ExecuteArgs,
+	record: ToolCallRecord,
+	executionArgs: unknown,
+): Promise<unknown | null> {
+	const sensitive = getSensitiveInputs(args.base);
+	if (!sensitive || !executionArgs || typeof executionArgs !== 'object') {
+		return executionArgs;
+	}
+	let next = executionArgs as Record<string, unknown>;
+	for (const entry of sensitive) {
+		const secure = entry.secureInput;
+		if (!secure || entry.path.includes('.')) continue;
+		const current = next[entry.path];
+		if (typeof current === 'string' && current.length > 0) continue;
+		if (secure.when && !secure.when(next)) continue;
+		const value = await requestSecureInput({
+			projectRoot: args.ctx.projectRoot,
 			sessionId: args.ctx.sessionId,
 			messageId: args.ctx.messageId,
-			callId: args.callId,
+			callId: record.callId,
+			prompt: secure.prompt,
+			inputKind: 'password',
+			allowRemember: false,
+			signal: getAbortSignal(args.options),
+		});
+		if (value === null || getAbortSignal(args.options)?.aborted) return null;
+		next = { ...next, [entry.path]: value };
+	}
+	return next;
+}
+
+/**
+ * Persists, records stats for, and publishes a call's outcome exactly once
+ * per call id. Retries only persistence, never execution. The redacted
+ * outcome is journaled first so restart recovery can replay it if the DB
+ * write fails or the process dies. An exhausted durability barrier rejects
+ * the call without publishing a result; the journal record is kept and the
+ * failure log states what a restart will recover (`restartRecovery`).
+ */
+async function finalizeToolCall(
+	args: ExecuteArgs,
+	record: ToolCallRecord,
+	outcome: ToolOutcome,
+	stepState: StepExecutionState,
+	stepIndex: number | undefined,
+): Promise<void> {
+	if (record.finalized) return;
+
+	const { ctx, name } = args;
+	const succeeded = outcome.status === 'success';
+	if (succeeded) markToolSucceeded(stepState, args.failureState, name);
+	else markToolFailed(stepState, args.failureState, name);
+
+	const callId = record.callId;
+	record.resultPartId ??= crypto.randomUUID();
+	record.finalization ??= {
+		partId: record.resultPartId,
+		...computeToolTiming(record.startTs),
+		content: buildToolResultContent({
+			name,
+			result: outcome.result,
+			callId,
+			input: redactToolInput(args.base, record.args),
+		}),
+	};
+	record.args = undefined;
+	const finalization = record.finalization;
+	const { endTs, durationMs, partId, content } = finalization;
+
+	const persist = async () => {
+		finalization.index ??= await ctx.nextIndex();
+		await persistToolResultWithIndex(ctx, {
+			partId,
+			index: finalization.index,
+			name,
+			content,
+			startTs: record.startTs,
+			callId,
+			stepIndex,
+			endTs,
+			durationMs,
+		});
+	};
+	const logPersistFailure = (error: unknown) => {
+		logger.warn('[tool] failed to persist tool result', {
+			sessionId: ctx.sessionId,
+			messageId: ctx.messageId,
+			tool: name,
+			callId,
+			error: error instanceof Error ? error.message : String(error),
+		});
+	};
+
+	if (record.journalState !== 'outcome') {
+		try {
+			finalization.index ??= await ctx.nextIndex();
+		} catch {}
+		await journalToolOutcome(ctx, record, outcome, finalization);
+	}
+
+	for (let attempt = 0; attempt < 3; attempt++) {
+		try {
+			await persist();
+			break;
+		} catch (error) {
+			if (attempt === 2) {
+				logger.error('[tool] tool result is not durable in the database', {
+					sessionId: ctx.sessionId,
+					messageId: ctx.messageId,
+					tool: name,
+					callId,
+					restartRecovery: toolRestartRecovery(record),
+					error: error instanceof Error ? error.message : String(error),
+				});
+				throw new ToolResultDurabilityError(callId, name, outcome, error);
+			}
+		}
+	}
+	record.finalized = true;
+	await clearToolJournal(ctx, record);
+
+	if (succeeded) {
+		try {
+			await updateToolSessionStats(ctx, { name, durationMs, endTs });
+		} catch (error) {
+			logPersistFailure(error);
+		}
+	}
+
+	try {
+		const eventContent =
+			succeeded && name === 'browser'
+				? referenceBrowserScreenshot(content, ctx.sessionId, callId)
+				: content;
+		publishToolResult(ctx, eventContent, stepIndex);
+		if (succeeded) {
+			logToolResult(ctx, { name, callId, stepIndex });
+			if (name === 'update_todos') {
+				publishPlanUpdated(ctx, content.result, content.args);
+			}
+		}
+	} catch (error) {
+		logger.warn('[tool] failed to publish tool result', {
+			sessionId: ctx.sessionId,
+			messageId: ctx.messageId,
+			tool: name,
+			callId,
 			error: error instanceof Error ? error.message : String(error),
 		});
 	}

@@ -759,7 +759,7 @@ export class MemoryStore {
 			context,
 			options.includeGlobal ?? true,
 			options.audience,
-		).filter((row) => !excluded.has(row.id));
+		);
 		if (!allowed.length) {
 			this.logEvent({
 				type: 'recall',
@@ -796,7 +796,29 @@ export class MemoryStore {
 			const row = byId.get(match.id);
 			return row ? [row] : [];
 		});
-		if (this.embedder) await this.reindex(20);
+		if (this.embedder) {
+			const embedder = this.embedder;
+			const superseded = this.supersededIds(context);
+			const missing = allowed
+				.filter(
+					(row) =>
+						!excluded.has(row.id) &&
+						!superseded.has(row.id) &&
+						!this.db
+							.query(
+								'SELECT 1 FROM memory_embeddings WHERE memory_id = ? AND model = ?',
+							)
+							.get(row.id, embedder.model),
+				)
+				.slice(0, 20);
+			try {
+				const vectors = missing.length
+					? await this.embedder.embed(missing.map((row) => row.content))
+					: [];
+				for (const [i, row] of missing.entries())
+					if (vectors[i]) this.saveVector(row.id, vectors[i]);
+			} catch {}
+		}
 		const vector = await this.vectorFor(query);
 		const neighbors = vector ? this.vectorNeighbors(vector, allowed) : [];
 		const candidates = [
@@ -852,9 +874,7 @@ export class MemoryStore {
 		const budget = Math.min(Math.max(options.limit ?? 5, 1), 10);
 		const limit = options.injection ? 10 : budget;
 		const edges = this.scopedEdges(allowed);
-		const superseded = options.audience
-			? this.supersededIds(context)
-			: new Set<string>();
+		const superseded = this.supersededIds(context);
 		const heads: Row[] = [];
 		for (const row of ranked) {
 			let current = row;
@@ -868,6 +888,7 @@ export class MemoryStore {
 			}
 			if (
 				!superseded.has(current.id) &&
+				!excluded.has(current.id) &&
 				!heads.some((item) => item.id === current.id)
 			)
 				heads.push(current);
@@ -903,6 +924,7 @@ export class MemoryStore {
 						neighbor &&
 						!selected.some((item) => item.id === neighbor.id) &&
 						!superseded.has(neighbor.id) &&
+						!excluded.has(neighbor.id) &&
 						!edges.some(
 							(item) => item.type === 'supersedes' && item.toId === neighbor.id,
 						)
@@ -1107,10 +1129,13 @@ export class MemoryStore {
 				status: 'rejected',
 				reason: 'Replacement is not accessible in this scope',
 			};
-		const exact = candidates.find(
-			(row) => row.content.toLowerCase() === content.toLowerCase(),
-		);
 		const superseded = this.supersededIds(context);
+		const exact = candidates.find(
+			(row) =>
+				!superseded.has(row.id) &&
+				row.content.toLowerCase() === content.toLowerCase(),
+		);
+		let duplicate: Row | undefined;
 		if (exact) {
 			// Re-saving identical text with different explicit metadata is a metadata correction.
 			const changes =
@@ -1121,9 +1146,8 @@ export class MemoryStore {
 					input.audience !== audienceOf(exact)) ||
 					(input.priority !== undefined &&
 						input.priority !== priorityOf(exact)));
-			if (!changes)
-				return { status: 'duplicate', memory: this.publicRow(exact) };
-			replacement = exact;
+			if (!changes) duplicate = exact;
+			else replacement = exact;
 		}
 		if (replacement && superseded.has(replacement.id))
 			return {
@@ -1138,7 +1162,9 @@ export class MemoryStore {
 			input.audience ??
 			(explicitReplacement
 				? audienceOf(explicitReplacement)
-				: await this.judgeAudience(content));
+				: duplicate
+					? audienceOf(duplicate)
+					: await this.judgeAudience(content));
 		const byVisibleId = new Map(visible.map((row) => [row.id, row]));
 		const explicitLinks: Array<{ row: Row; type: MemoryLinkType }> = [];
 		for (const link of requestedLinks) {
@@ -1165,6 +1191,8 @@ export class MemoryStore {
 			)
 				explicitLinks.push({ row, type: link.type });
 		}
+		if (duplicate)
+			return { status: 'duplicate', memory: this.publicRow(duplicate) };
 		const judgedLinks: Array<{
 			row: Row;
 			type: MemoryEdgeType;

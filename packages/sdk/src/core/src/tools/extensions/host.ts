@@ -19,6 +19,39 @@ import {
 	type NativeExtensionResponse,
 } from './protocol.ts';
 import { prepareImageForModel } from '../image.ts';
+import { ShellOutputCollector } from '../shell/output.ts';
+
+const processGroups = new Set<number>();
+function killGroup(pid: number): void {
+	try {
+		process.kill(-pid, 'SIGKILL');
+	} catch {
+		try {
+			process.kill(pid, 'SIGKILL');
+		} catch {}
+	}
+}
+async function readBounded(
+	stream: ReadableStream<Uint8Array>,
+): Promise<string> {
+	const reader = stream.getReader();
+	const decoder = new TextDecoder();
+	const collector = new ShellOutputCollector('full', 100, 1024 * 1024);
+	let text = '';
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			text = collector.append(decoder.decode(value, { stream: true }));
+		}
+		text = collector.append(decoder.decode());
+		return collector.metadata('stdout').stdoutTruncated
+			? `[output truncated to last 1048576 bytes]\n${text}`
+			: text;
+	} finally {
+		reader.releaseLock();
+	}
+}
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const handlers = new Map<string, Promise<NativeToolHandler>>();
@@ -103,16 +136,18 @@ async function runProcess(
 	const subprocess = Bun.spawn([options.command, ...(options.args ?? [])], {
 		cwd,
 		env,
+		detached: true,
 		stdin: 'ignore',
 		stdout: 'pipe',
 		stderr: 'pipe',
 	});
-	const onAbort = () => subprocess.kill();
+	processGroups.add(subprocess.pid);
+	const onAbort = () => killGroup(subprocess.pid);
 	if (signal.aborted) onAbort();
 	else signal.addEventListener('abort', onAbort, { once: true });
 	try {
-		const stdoutPromise = new Response(subprocess.stdout).text();
-		const stderrPromise = new Response(subprocess.stderr).text();
+		const stdoutPromise = readBounded(subprocess.stdout);
+		const stderrPromise = readBounded(subprocess.stderr);
 		const exitCode = await subprocess.exited;
 		const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise]);
 		if (signal.aborted) throw new Error('Native extension call aborted');
@@ -126,6 +161,8 @@ async function runProcess(
 		return { exitCode, stdout, stderr };
 	} finally {
 		signal.removeEventListener('abort', onAbort);
+		killGroup(subprocess.pid);
+		processGroups.delete(subprocess.pid);
 	}
 }
 
@@ -209,7 +246,14 @@ function createOutputContext(projectRoot: string): NativeToolContext['output'] {
 }
 
 function writeFrame(frame: NativeExtensionOutputFrame): void {
-	process.stdout.write(`${JSON.stringify(frame)}\n`);
+	const serialized = `${JSON.stringify(frame)}\n`;
+	if (
+		Buffer.byteLength(serialized) > 16 * 1024 * 1024 ||
+		process.stdout.writableLength > 16 * 1024 * 1024
+	) {
+		throw new Error('Native extension output frame limit exceeded');
+	}
+	process.stdout.write(serialized);
 }
 
 async function executeRequest(
@@ -311,6 +355,13 @@ function handleFrame(frame: NativeExtensionInputFrame): void {
 
 export async function runNativeExtensionHost(): Promise<void> {
 	redirectExtensionConsoleToStderr();
+	const shutdown = () => {
+		for (const controller of activeCalls.values()) controller.abort();
+		for (const pid of processGroups) killGroup(pid);
+		process.exit(143);
+	};
+	process.once('SIGTERM', shutdown);
+	process.once('SIGINT', shutdown);
 	const lines = createInterface({
 		input: process.stdin,
 		crlfDelay: Number.POSITIVE_INFINITY,

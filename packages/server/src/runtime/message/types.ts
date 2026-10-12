@@ -23,6 +23,19 @@ export type AttachmentOriginalMetadata = {
 
 export type SessionRow = typeof sessions.$inferSelect;
 
+export type TurnTransaction = Parameters<Parameters<DB['transaction']>[0]>[0];
+
+export type AcceptedTurnIds = {
+	userMessageId: string;
+	assistantMessageId: string;
+};
+
+/**
+ * Runs inside the transaction that persists an accepted turn, after its
+ * message rows are inserted. Throwing rolls back the whole turn.
+ */
+export type TurnClaim = (tx: TurnTransaction, ids: AcceptedTurnIds) => void;
+
 export type DispatchOptions = {
 	messageOrigin?: 'human' | 'parent-agent' | 'agent-results' | 'system';
 	memoryTask?: string;
@@ -56,4 +69,6 @@ export type DispatchOptions = {
 		original?: AttachmentOriginalMetadata;
 	}>;
 	context?: MessageContext;
+	/** Extra writes committed atomically with the accepted turn. */
+	acceptClaim?: TurnClaim;
 };

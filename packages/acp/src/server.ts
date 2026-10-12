@@ -9,9 +9,9 @@ let configuredBaseUrl: string | null = null;
  */
 export async function ensureAcpServer(): Promise<string> {
 	if (process.env.OTTO_SERVER_URL) {
-		const url = String(process.env.OTTO_SERVER_URL);
-		configureClient(url);
-		return url;
+		throw new Error(
+			'ACP remote execution via OTTO_SERVER_URL is not supported; unset OTTO_SERVER_URL to use local execution.',
+		);
 	}
 
 	if (currentServer) return `http://localhost:${currentServer.port}`;

@@ -56,39 +56,6 @@ export async function updateSessionTokensIncremental(
 }
 
 /**
- * Updates session token counts after a run completes.
- * @deprecated Use updateSessionTokensIncremental for per-step tracking
- */
-export async function updateSessionTokens(
-	fin: { usage?: { inputTokens?: number; outputTokens?: number } },
-	opts: RunOpts,
-	db: RuntimeDb,
-): Promise<void> {
-	if (!fin.usage || !db) return;
-
-	const sessRows = await db
-		.select()
-		.from(sessions)
-		.where(eq(sessions.id, opts.sessionId));
-
-	if (sessRows.length > 0 && sessRows[0]) {
-		const row = sessRows[0];
-		const priorInput = Number(row.totalInputTokens ?? 0);
-		const priorOutput = Number(row.totalOutputTokens ?? 0);
-		const nextInput = priorInput + Number(fin.usage.inputTokens ?? 0);
-		const nextOutput = priorOutput + Number(fin.usage.outputTokens ?? 0);
-
-		await db
-			.update(sessions)
-			.set({
-				totalInputTokens: nextInput,
-				totalOutputTokens: nextOutput,
-			})
-			.where(eq(sessions.id, opts.sessionId));
-	}
-}
-
-/**
  * Updates message token counts after each step.
  * AI SDK v6: onStepFinish.usage is PER-STEP. We ADD each step's tokens to message totals.
  */

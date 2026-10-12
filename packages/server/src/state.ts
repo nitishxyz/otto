@@ -1,6 +1,8 @@
 /**
  * Server state - tracks runtime information like the server's port
  * This is the single source of truth for server configuration
+ * State is process-wide: embedded and standalone apps share this configuration,
+ * project manager, queues and event bus. Multiple isolated runtimes are unsupported.
  */
 
 let serverPort: number | null = null;

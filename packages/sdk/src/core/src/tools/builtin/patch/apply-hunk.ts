@@ -126,92 +126,23 @@ export function applyHunkToLines(
 			? Math.max(0, hunk.header.oldStart - 1)
 			: hint;
 
-	let matchIndex = hasExpected
-		? findSubsequence(lines, expected, Math.max(0, initialHint - 3), useFuzzy)
-		: -1;
-	let matchedExpected = expected;
-
-	if (hasExpected && matchIndex === -1) {
-		matchIndex = findSubsequence(lines, expected, 0, useFuzzy);
-	}
-
-	if (matchIndex === -1 && removals.length > 0) {
-		const allContextPresent = contextLines.every((line) =>
-			lineExists(lines, line, useFuzzy),
-		);
-		if (!allContextPresent) {
-			matchIndex = -1;
-		} else {
-			const expectedWithoutMissingRemovals = hunk.lines
-				.filter((line) => {
-					if (line.kind === 'add') return false;
-					if (line.kind === 'remove') {
-						return lineExists(lines, line.content, useFuzzy);
-					}
-					return true;
-				})
-				.map((line) => line.content);
-			const includedRemovalCount = hunk.lines.filter(
-				(line) =>
-					line.kind === 'remove' && lineExists(lines, line.content, useFuzzy),
-			).length;
-			const minRequired = Math.max(contextLines.length, 2);
-			if (
-				includedRemovalCount > 0 &&
-				expectedWithoutMissingRemovals.length >= minRequired
-			) {
-				matchIndex = findSubsequence(
-					lines,
-					expectedWithoutMissingRemovals,
-					Math.max(0, initialHint - 3),
-					useFuzzy,
-				);
-				if (matchIndex === -1) {
-					matchIndex = findSubsequence(
-						lines,
-						expectedWithoutMissingRemovals,
-						0,
-						useFuzzy,
-					);
-				}
-				if (matchIndex !== -1) {
-					matchedExpected = expectedWithoutMissingRemovals;
-				}
-			}
+	const uniqueMatch = (fuzzy: boolean): number => {
+		const first = findSubsequence(lines, expected, 0, fuzzy);
+		if (
+			first !== -1 &&
+			findSubsequence(lines, expected, first + 1, fuzzy) !== -1
+		) {
+			throw new Error(
+				'Ambiguous patch hunk: expected block occurs more than once.',
+			);
 		}
-	}
+		return first;
+	};
+	let matchIndex = hasExpected ? uniqueMatch(false) : -1;
+	const matchedExpected = expected;
 
-	if (
-		matchIndex === -1 &&
-		useFuzzy &&
-		removals.length >= 2 &&
-		contextLines.length === 0
-	) {
-		const firstRemoval = removals[0].content;
-		const lastRemoval = removals[removals.length - 1].content;
-		const firstIdx = findLineIndex(lines, firstRemoval, 0, true);
-		if (firstIdx !== -1) {
-			const rangeEnd = firstIdx + expected.length - 1;
-			if (rangeEnd < lines.length) {
-				const lastInRange = lines[rangeEnd];
-				const lastMatches = linesMatch(lastInRange, lastRemoval, true);
-				if (lastMatches) {
-					let matchCount = 0;
-					for (let k = 0; k < expected.length; k++) {
-						const fileLine = lines[firstIdx + k];
-						const expLine = expected[k];
-						if (linesMatch(fileLine, expLine, true)) {
-							matchCount++;
-						}
-					}
-					const matchRatio = matchCount / expected.length;
-					if (matchRatio >= 0.5) {
-						matchIndex = firstIdx;
-						matchedExpected = lines.slice(firstIdx, firstIdx + expected.length);
-					}
-				}
-			}
-		}
+	if (hasExpected && matchIndex === -1 && useFuzzy) {
+		matchIndex = uniqueMatch(true);
 	}
 
 	if (matchIndex === -1 && isHunkAlreadyApplied(lines, hunk, useFuzzy)) {
@@ -224,15 +155,13 @@ export function applyHunkToLines(
 			oldLines: 0,
 			newStart: skipStart,
 			newLines: replacement.length,
-			additions: hunk.lines.filter((l) => l.kind === 'add').length,
-			deletions: hunk.lines.filter((l) => l.kind === 'remove').length,
+			additions: 0,
+			deletions: 0,
 		};
 	}
-
 	if (matchIndex === -1 && !hasExpected) {
 		matchIndex = computeInsertionIndex(lines, hunk.header, initialHint);
 	}
-
 	if (matchIndex === -1) {
 		const contextInfo = hunk.header.context
 			? ` near context '${hunk.header.context}'`

@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 #[cfg(target_os = "macos")]
 use std::io::{Read, Write};
@@ -10,9 +10,10 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 #[cfg(target_os = "macos")]
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, WebviewWindow};
 #[cfg(target_os = "macos")]
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
+use tauri::Manager;
+use tauri::{AppHandle, WebviewWindow};
 #[cfg(not(target_os = "macos"))]
 use tauri_plugin_notification::NotificationExt;
 
@@ -35,6 +36,136 @@ const NOTIFICATION_HELPER_POLL_INTERVAL: Duration = Duration::from_millis(250);
 struct NotificationTarget {
     window_label: String,
     session_id: Option<String>,
+    context: Option<NotificationWindowContext>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct NotificationWorkspace {
+    server_url: String,
+    project_id: String,
+    project_path: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct NotificationWindowContext {
+    workspace: NotificationWorkspace,
+    project: serde_json::Value,
+    session_id: Option<String>,
+    #[serde(skip_deserializing)]
+    machine: Option<super::machine::MachineBootstrap>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NotificationSessionOpen {
+    window_label: String,
+    workspace: NotificationWorkspace,
+    session_id: String,
+}
+
+static NOTIFICATION_WINDOWS: OnceLock<Mutex<HashMap<String, NotificationWindowContext>>> =
+    OnceLock::new();
+static INITIAL_NOTIFICATIONS: OnceLock<Mutex<HashMap<String, NotificationWindowContext>>> =
+    OnceLock::new();
+
+fn notification_windows() -> &'static Mutex<HashMap<String, NotificationWindowContext>> {
+    NOTIFICATION_WINDOWS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+pub(crate) fn forget_notification_window(label: &str) {
+    if let Ok(mut windows) = notification_windows().lock() {
+        windows.remove(label);
+    }
+    if let Ok(mut initial) = INITIAL_NOTIFICATIONS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+    {
+        initial.remove(label);
+    }
+}
+
+#[tauri::command]
+pub fn set_notification_window_context(
+    app: AppHandle,
+    window: WebviewWindow,
+    context: Option<NotificationWindowContext>,
+) -> Result<(), String> {
+    let mut windows = notification_windows()
+        .lock()
+        .map_err(|error| error.to_string())?;
+    if let Some(context) = context {
+        let machine = app
+            .state::<super::machine::MachineWindowState>()
+            .0
+            .lock()
+            .map_err(|error| error.to_string())?
+            .get(window.label())
+            .map(|machine| machine.bootstrap.clone());
+        windows.insert(
+            window.label().to_string(),
+            snapshot_notification_context(context, machine),
+        );
+    } else {
+        windows.remove(window.label());
+    }
+    Ok(())
+}
+
+fn snapshot_notification_context(
+    mut context: NotificationWindowContext,
+    machine: Option<super::machine::MachineBootstrap>,
+) -> NotificationWindowContext {
+    context.machine = machine;
+    if let Some(project) = context.project.as_object_mut() {
+        project.remove("machineOwnerSession");
+        project.remove("machineOwnerSessionExpiresAt");
+        if context.machine.is_some() {
+            project.insert(
+                "remoteUrl".to_string(),
+                serde_json::Value::String(context.workspace.server_url.clone()),
+            );
+        }
+    }
+    context
+}
+
+#[tauri::command]
+pub fn get_initial_notification(
+    window: WebviewWindow,
+) -> Result<Option<NotificationWindowContext>, String> {
+    // Keep bootstrap reads idempotent across React StrictMode initialization.
+    Ok(INITIAL_NOTIFICATIONS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .map_err(|error| error.to_string())?
+        .get(window.label())
+        .cloned())
+}
+
+fn scoped_notification_id(id: &str, context: Option<&NotificationWindowContext>) -> String {
+    serde_json::to_string(&(context.map(|context| &context.workspace), id)).unwrap()
+}
+
+fn select_notification_window(
+    windows: &HashMap<String, NotificationWindowContext>,
+    target: &NotificationTarget,
+    exists: impl Fn(&str) -> bool,
+) -> Option<String> {
+    let context = target.context.as_ref()?;
+    let mut candidates = windows
+        .iter()
+        .filter(|(label, current)| current.workspace == context.workspace && exists(label))
+        .collect::<Vec<_>>();
+    candidates.sort_by_key(|(label, current)| {
+        (
+            current.session_id != target.session_id,
+            label.as_str() != target.window_label,
+            label.as_str(),
+        )
+    });
+    candidates.first().map(|(label, _)| (*label).clone())
 }
 
 struct PendingNotification {
@@ -65,6 +196,7 @@ fn notification_target(
         NotificationTarget {
             window_label: window_label.to_string(),
             session_id,
+            context: None,
         },
         if owns_session {
             2
@@ -115,17 +247,53 @@ fn take_notification_target(id: &str) -> Option<NotificationTarget> {
 }
 
 #[cfg(target_os = "macos")]
-fn open_session_window(app: &AppHandle, window_label: &str, session_id: Option<String>) {
-    let Some(window) = app.get_webview_window(window_label) else {
+fn open_session_window(app: &AppHandle, target: NotificationTarget) {
+    let Some(mut context) = target.context.clone() else {
         return;
     };
-
-    let _ = window.unminimize();
-    let _ = window.show();
-    let _ = window.set_focus();
-
-    if let Some(session_id) = session_id {
-        let _ = window.emit("otto-open-session", session_id);
+    let Some(session_id) = target.session_id.clone() else {
+        return;
+    };
+    let label = notification_windows().lock().ok().and_then(|windows| {
+        select_notification_window(&windows, &target, |label| {
+            app.get_webview_window(label).is_some()
+        })
+    });
+    if let Some(window_label) = label {
+        // emit_to is essential: Emitter::emit also reaches other windows.
+        let _ = app.emit_to(
+            window_label.clone(),
+            "otto-open-session",
+            NotificationSessionOpen {
+                window_label,
+                workspace: context.workspace,
+                session_id,
+            },
+        );
+    } else {
+        context.session_id = Some(session_id);
+        let machine = context.machine.clone();
+        let project_id = context.workspace.project_id.clone();
+        let _ = super::window::create_window(app, |label| {
+            if let Ok(mut initial) = INITIAL_NOTIFICATIONS
+                .get_or_init(|| Mutex::new(HashMap::new()))
+                .lock()
+            {
+                initial.insert(label.to_string(), context);
+            }
+            if let Some(bootstrap) = machine {
+                let state = app.state::<super::machine::MachineWindowState>();
+                if let Ok(mut windows) = state.0.lock() {
+                    windows.insert(
+                        label.to_string(),
+                        super::machine::MachineWindowContext {
+                            bootstrap,
+                            project_id: Some(project_id),
+                        },
+                    );
+                };
+            }
+        });
     }
 }
 
@@ -298,19 +466,25 @@ pub fn show_native_notification(
     } else {
         None
     };
-    let (target, priority) = notification_target(
+    let (mut target, priority) = notification_target(
         window.label(),
         notification.session_id.clone(),
         notification.active_session_id.as_deref(),
         notification.window_focused,
     );
+    target.context = notification_windows()
+        .lock()
+        .map_err(|error| error.to_string())?
+        .get(window.label())
+        .cloned();
+    let notification_id = scoped_notification_id(&notification.id, target.context.as_ref());
     let is_new = {
         let mut notifications = pending_notifications()
             .lock()
             .map_err(|error| error.to_string())?;
         register_notification(
             &mut notifications,
-            &notification.id,
+            &notification_id,
             target,
             priority,
             Instant::now(),
@@ -350,7 +524,6 @@ pub fn show_native_notification(
     let callback_url = format!("http://127.0.0.1:{port}/notification-click/{token}");
     let expected_path = format!("/notification-click/{token}");
     let app_for_click = app.clone();
-    let notification_id = notification.id.clone();
 
     std::thread::spawn(move || {
         let _ = listener.set_nonblocking(true);
@@ -368,11 +541,7 @@ pub fn show_native_notification(
                         if let Some(target) = take_notification_target(&notification_id) {
                             let app_for_main = app_for_click.clone();
                             let _ = app_for_click.run_on_main_thread(move || {
-                                open_session_window(
-                                    &app_for_main,
-                                    &target.window_label,
-                                    target.session_id,
-                                );
+                                open_session_window(&app_for_main, target);
                             });
                         }
                     }
@@ -407,19 +576,25 @@ pub fn show_native_notification(
     window: WebviewWindow,
     notification: NativeNotificationPayload,
 ) -> Result<(), String> {
-    let (target, priority) = notification_target(
+    let (mut target, priority) = notification_target(
         window.label(),
         notification.session_id.clone(),
         notification.active_session_id.as_deref(),
         notification.window_focused,
     );
+    target.context = notification_windows()
+        .lock()
+        .map_err(|error| error.to_string())?
+        .get(window.label())
+        .cloned();
+    let notification_id = scoped_notification_id(&notification.id, target.context.as_ref());
     let is_new = {
         let mut notifications = pending_notifications()
             .lock()
             .map_err(|error| error.to_string())?;
         register_notification(
             &mut notifications,
-            &notification.id,
+            &notification_id,
             target,
             priority,
             Instant::now(),
@@ -445,10 +620,136 @@ mod tests {
         NOTIFICATION_DEDUP_TTL,
     };
     use super::{
-        notification_target, register_notification, NotificationTarget, PendingNotification,
+        notification_target, register_notification, scoped_notification_id,
+        select_notification_window, snapshot_notification_context, NotificationTarget,
+        NotificationWindowContext, NotificationWorkspace, PendingNotification,
     };
     use std::collections::HashMap;
     use std::time::{Duration, Instant};
+
+    fn context(server: &str, project: &str, session: &str) -> NotificationWindowContext {
+        NotificationWindowContext {
+            workspace: NotificationWorkspace {
+                server_url: server.to_string(),
+                project_id: project.to_string(),
+                project_path: "/project".to_string(),
+            },
+            project: serde_json::json!({ "path": "/project" }),
+            session_id: Some(session.to_string()),
+            machine: None,
+        }
+    }
+
+    #[test]
+    fn fallback_snapshot_keeps_machine_a_after_source_switches_to_b() {
+        let mut source = super::super::machine::MachineBootstrap {
+            device_id: "device-a".to_string(),
+            machine_id: "machine-a".to_string(),
+            hostname: Some("a.test".to_string()),
+            name: None,
+        };
+        let mut original = context("https://a.test/", "project-a", "session-a");
+        original.project = serde_json::json!({
+            "path": "/project", "machineOwnerSession": "old-secret", "machineOwnerSessionExpiresAt": 100,
+        });
+        let captured = snapshot_notification_context(original, Some(source.clone()));
+        let (send, receive) = std::sync::mpsc::channel();
+        let activation = std::thread::spawn(move || {
+            receive.recv().unwrap();
+            assert_eq!(captured.machine.as_ref().unwrap().machine_id, "machine-a");
+            assert_eq!(captured.workspace.server_url, "https://a.test/");
+            assert!(captured.project.get("machineOwnerSession").is_none());
+            assert!(captured
+                .project
+                .get("machineOwnerSessionExpiresAt")
+                .is_none());
+        });
+        source.machine_id = "machine-b".to_string();
+        source.hostname = Some("b.test".to_string());
+        send.send(()).unwrap();
+        activation.join().unwrap();
+        assert_eq!(source.machine_id, "machine-b");
+    }
+
+    fn target() -> NotificationTarget {
+        NotificationTarget {
+            window_label: "owner".to_string(),
+            session_id: Some("session".to_string()),
+            context: Some(context("server-a", "project", "session")),
+        }
+    }
+
+    #[test]
+    fn activation_selects_one_owner_not_same_project_or_remote_id_collisions() {
+        let windows = HashMap::from([
+            (
+                "owner".to_string(),
+                context("server-a", "project", "session"),
+            ),
+            (
+                "other-session".to_string(),
+                context("server-a", "project", "other"),
+            ),
+            (
+                "other-server".to_string(),
+                context("server-b", "project", "session"),
+            ),
+            (
+                "other-project".to_string(),
+                context("server-a", "other", "session"),
+            ),
+        ]);
+        assert_eq!(
+            select_notification_window(&windows, &target(), |_| true).as_deref(),
+            Some("owner")
+        );
+        assert_eq!(
+            select_notification_window(&windows, &target(), |label| label != "owner").as_deref(),
+            Some("other-session")
+        );
+        assert_eq!(
+            select_notification_window(&windows, &target(), |label| label == "other-server"
+                || label == "other-project"),
+            None
+        );
+    }
+
+    #[test]
+    fn activation_uses_current_ownership_and_creates_window_when_workspace_absent() {
+        let windows = HashMap::from([
+            ("owner".to_string(), context("server-a", "other", "session")),
+            (
+                "new-owner".to_string(),
+                context("server-a", "project", "session"),
+            ),
+        ]);
+        assert_eq!(
+            select_notification_window(&windows, &target(), |_| true).as_deref(),
+            Some("new-owner")
+        );
+        assert_eq!(
+            select_notification_window(&windows, &target(), |_| false),
+            None
+        );
+        assert_eq!(
+            select_notification_window(&HashMap::new(), &target(), |_| true),
+            None
+        );
+    }
+
+    #[test]
+    fn notification_deduplication_is_scoped_to_server_and_workspace() {
+        let first = context("server-a", "project", "session");
+        let second = context("server-b", "project", "session");
+        assert_ne!(
+            scoped_notification_id("same-id", Some(&first)),
+            scoped_notification_id("same-id", Some(&second))
+        );
+        assert_eq!(
+            scoped_notification_id("same-id", Some(&first)),
+            scoped_notification_id("same-id", Some(&first))
+        );
+    }
 
     #[test]
     fn notification_target_prefers_the_window_showing_the_session() {
@@ -463,6 +764,7 @@ mod tests {
             NotificationTarget {
                 window_label: "main-7".to_string(),
                 session_id: Some("session-123".to_string()),
+                context: None,
             }
         );
         assert_eq!(priority, 2);

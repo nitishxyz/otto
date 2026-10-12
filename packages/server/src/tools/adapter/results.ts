@@ -3,6 +3,7 @@ export {
 	createBlockedToolResult,
 	createRejectedToolResult,
 	createToolExceptionResult,
+	createUnjournaledToolResult,
 } from './result-errors.ts';
 export {
 	stripToolResultArtifactsForModel,

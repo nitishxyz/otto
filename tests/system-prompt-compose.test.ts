@@ -43,7 +43,20 @@ describe('system prompt composition', () => {
 			agentPrompt: 'AGENT',
 			oneShot: true,
 		});
-		expect(prompt).toContain('One-shot mode ACTIVE');
+		expect(prompt).toContain('One-shot mode is active.');
+		expect(prompt).toContain(
+			'Execute authorized tasks without interactive prompts.',
+		);
+		expect(prompt).toContain(
+			'Existing tool approvals, permissions, and safety policies still apply.',
+		);
+		expect(prompt).toContain(
+			'If an operation is destructive, blocked, or requires approval that is unavailable, skip it and report the limitation.',
+		);
+		expect(prompt).toContain(
+			'One-shot mode does not grant additional permissions.',
+		);
+		expect(prompt).toContain('Do not bypass approval or safety checks.');
 		expect(components).toContain('mode:oneshot');
 	});
 
@@ -55,7 +68,7 @@ describe('system prompt composition', () => {
 			agentPrompt: 'AGENT',
 			oneShot: false,
 		});
-		expect(prompt).not.toContain('One-shot mode ACTIVE');
+		expect(prompt).not.toContain('One-shot mode is active.');
 		expect(components).not.toContain('mode:oneshot');
 	});
 

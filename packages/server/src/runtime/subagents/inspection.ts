@@ -100,7 +100,7 @@ export async function getSubagentStatus(args: {
 	const limits = getModelLimits(session.provider, session.model);
 	const usedTokens = Math.max(0, session.currentContextTokens ?? 0);
 	const windowTokens = limits?.context ?? null;
-	const queue = getQueueState(session.id);
+	const queue = getQueueState(session.id, session.projectPath);
 	return {
 		ok: true,
 		subagent: {

@@ -198,8 +198,13 @@ function isGpt5OrLater(model: string): boolean {
 	return Number(match[1]) >= 5;
 }
 
-function needsResponsesApi(model: string): boolean {
-	return isGpt5OrLater(model) && !model.startsWith('gpt-5-mini');
+export type CopilotTransport = 'responses' | 'chat';
+
+/** Single source of truth for which OpenAI API a Copilot model uses. */
+export function getCopilotTransport(model: string): CopilotTransport {
+	return isGpt5OrLater(model) && !model.startsWith('gpt-5-mini')
+		? 'responses'
+		: 'chat';
 }
 
 export function createCopilotModel(model: string, config: CopilotOAuthConfig) {
@@ -211,7 +216,7 @@ export function createCopilotModel(model: string, config: CopilotOAuthConfig) {
 		fetch: customFetch as typeof fetch,
 	});
 
-	return needsResponsesApi(model)
+	return getCopilotTransport(model) === 'responses'
 		? provider.responses(model)
 		: provider.chat(model);
 }

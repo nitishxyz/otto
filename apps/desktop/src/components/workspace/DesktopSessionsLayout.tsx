@@ -38,6 +38,12 @@ import {
 	useSidebarStore,
 } from '@ottocode/web-sdk/stores';
 import type { Project } from '../../lib/tauri-bridge';
+import { tauriBridge } from '../../lib/tauri-bridge';
+import {
+	notificationWorkspace,
+	type NotificationSessionOpen,
+} from '../../lib/notification-routing';
+import { createNotificationLifecycle } from '../../lib/notification-lifecycle';
 import { DesktopAppLayout } from './DesktopAppLayout';
 
 interface DesktopSessionsLayoutProps {
@@ -72,6 +78,12 @@ export function DesktopSessionsLayout({
 	);
 	const defaultAgent =
 		project.kind === 'general' ? 'general' : config?.defaults.agent;
+	const notificationGeneration = useMemo(
+		() => ({ project, sessionId }),
+		[project, sessionId],
+	);
+	const notificationGenerationRef = useRef(notificationGeneration);
+	notificationGenerationRef.current = notificationGeneration;
 
 	useWorkingDirectory();
 	useClientEvents(sessionId);
@@ -236,34 +248,49 @@ export function DesktopSessionsLayout({
 	useEffect(() => {
 		const win = window as Window & {
 			OTTO_OPEN_SESSION?: (sessionId: string) => void | Promise<void>;
+			OTTO_SERVER_URL?: string;
+			OTTO_RUNTIME_CONTEXT?: { projectId?: string };
 		};
-		let unlisten: (() => void) | undefined;
-		win.OTTO_OPEN_SESSION = async (nextSessionId: string) => {
-			const appWindow = getCurrentWindow();
-			await appWindow.unminimize().catch(() => {});
-			await appWindow.show().catch(() => {});
-			await appWindow.setFocus().catch(() => {});
-			await refreshSessionForNotificationOpen(nextSessionId);
-			handleSelectSession(nextSessionId);
-		};
-		getCurrentWindow()
-			.listen<string>('otto-open-session', (event) => {
-				void win.OTTO_OPEN_SESSION?.(event.payload);
-			})
-			.then((nextUnlisten) => {
-				unlisten = nextUnlisten;
-			})
-			.catch((error: unknown) => {
-				console.error('[otto] Failed to listen for session opens:', error);
-			});
+		const appWindow = getCurrentWindow();
+		const workspace = notificationWorkspace(
+			project,
+			win.OTTO_SERVER_URL ?? project.remoteUrl ?? '',
+			win.OTTO_RUNTIME_CONTEXT?.projectId,
+		);
+		const lifecycle = createNotificationLifecycle({
+			windowLabel: appWindow.label,
+			context: { workspace, project, sessionId },
+			isCurrent: () =>
+				notificationGenerationRef.current === notificationGeneration,
+			listen: (handler) =>
+				appWindow.listen<NotificationSessionOpen>(
+					'otto-open-session',
+					(event) => handler(event.payload),
+				),
+			register: (context) => tauriBridge.setNotificationWindowContext(context),
+			unminimize: () => appWindow.unminimize(),
+			show: () => appWindow.show(),
+			focus: () => appWindow.setFocus(),
+			refresh: refreshSessionForNotificationOpen,
+			navigate: handleSelectSession,
+			onError: (error) =>
+				console.error('[otto] Notification activation failed:', error),
+		});
+		win.OTTO_OPEN_SESSION = lifecycle.activate;
 
 		return () => {
-			unlisten?.();
-			if (win.OTTO_OPEN_SESSION) {
+			lifecycle.dispose();
+			if (win.OTTO_OPEN_SESSION === lifecycle.activate) {
 				delete win.OTTO_OPEN_SESSION;
 			}
 		};
-	}, [handleSelectSession, refreshSessionForNotificationOpen]);
+	}, [
+		handleSelectSession,
+		refreshSessionForNotificationOpen,
+		project,
+		sessionId,
+		notificationGeneration,
+	]);
 
 	useEffect(() => {
 		if (sessionId) {

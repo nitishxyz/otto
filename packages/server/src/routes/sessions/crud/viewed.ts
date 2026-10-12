@@ -72,6 +72,7 @@ export function registerMarkSessionViewedRoute(app: Hono) {
 					attachSessionCostSummary(
 						normalizeSessionRow(sessionForResponse, {
 							includeRunning: true,
+							projectRoot: cfg.projectRoot,
 						}),
 						costSummaries.get(sessionForResponse.id),
 					),

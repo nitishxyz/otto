@@ -1,7 +1,7 @@
 import { messageParts, sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
-import { publishToolResult, type ToolResultContent } from './events.ts';
+import type { ToolResultContent } from './events.ts';
 import { recordMessageContextActivity } from '../../runtime/message/context-metrics.ts';
 
 export type ToolTiming = {
@@ -71,76 +71,25 @@ export async function persistToolResultWithIndex(
 		durationMs: number | null;
 	},
 ): Promise<void> {
-	await ctx.db.insert(messageParts).values({
-		id: args.partId,
-		messageId: ctx.messageId,
-		index: args.index,
-		stepIndex: args.stepIndex,
-		type: 'tool_result',
-		content: JSON.stringify(args.content),
-		agent: ctx.agent,
-		provider: ctx.provider,
-		model: ctx.model,
-		startedAt: args.startTs,
-		completedAt: args.endTs,
-		toolName: args.name,
-		toolCallId: args.callId,
-		toolDurationMs: args.durationMs ?? undefined,
-	});
-}
-
-export async function persistToolResult(
-	ctx: ToolAdapterContext,
-	args: {
-		partId: string;
-		name: string;
-		content: ToolResultContent;
-		startTs?: number;
-		callId?: string;
-		stepIndex?: number;
-		endTs: number;
-		durationMs: number | null;
-	},
-): Promise<void> {
-	const index = await ctx.nextIndex();
-	await persistToolResultWithIndex(ctx, { ...args, index });
-}
-
-export async function persistToolErrorResult(
-	ctx: ToolAdapterContext,
-	args: {
-		name: string;
-		errorResult: unknown;
-		callId?: string;
-		startTs?: number;
-		stepIndexForEvent?: number;
-		input?: unknown;
-	},
-): Promise<void> {
-	const resultPartId = crypto.randomUUID();
-	const { endTs, durationMs } = computeToolTiming(args.startTs);
-	const effectiveStepIndex = args.stepIndexForEvent ?? ctx.stepIndex;
-	const content: ToolResultContent = {
-		name: args.name,
-		result: args.errorResult,
-		callId: args.callId,
-	};
-
-	if (args.input !== undefined) {
-		content.args = args.input;
-	}
-
-	await persistToolResult(ctx, {
-		partId: resultPartId,
-		name: args.name,
-		content,
-		startTs: args.startTs,
-		callId: args.callId,
-		stepIndex: effectiveStepIndex,
-		endTs,
-		durationMs,
-	});
-	publishToolResult(ctx, content, effectiveStepIndex);
+	await ctx.db
+		.insert(messageParts)
+		.values({
+			id: args.partId,
+			messageId: ctx.messageId,
+			index: args.index,
+			stepIndex: args.stepIndex,
+			type: 'tool_result',
+			content: JSON.stringify(args.content),
+			agent: ctx.agent,
+			provider: ctx.provider,
+			model: ctx.model,
+			startedAt: args.startTs,
+			completedAt: args.endTs,
+			toolName: args.name,
+			toolCallId: args.callId,
+			toolDurationMs: args.durationMs ?? undefined,
+		})
+		.onConflictDoNothing({ target: messageParts.id });
 }
 
 export async function updateToolSessionStats(

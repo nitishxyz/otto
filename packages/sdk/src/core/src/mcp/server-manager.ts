@@ -21,6 +21,8 @@ export class MCPServerManager {
 	private pendingAuth = new Map<string, string>();
 	private oauthStore = new OAuthCredentialStore();
 	private serverScopes = new Map<string, 'global' | 'project'>();
+	/** Configs as requested (before transient auth header injection). */
+	private serverConfigs = new Map<string, MCPServerConfig>();
 	private startupErrors = new Map<string, string>();
 	private _started = false;
 	private projectRoot: string | null = null;
@@ -54,6 +56,7 @@ export class MCPServerManager {
 	}
 
 	private async startSingleServer(config: MCPServerConfig): Promise<void> {
+		this.serverConfigs.set(config.name, config);
 		const client = new MCPClientWrapper(config);
 		const transport = config.transport ?? 'stdio';
 
@@ -168,6 +171,7 @@ export class MCPServerManager {
 		this.authProviders.clear();
 		this.pendingAuth.clear();
 		this.serverScopes.clear();
+		this.serverConfigs.clear();
 		this.startupErrors.clear();
 		this._started = false;
 	}
@@ -185,6 +189,7 @@ export class MCPServerManager {
 	async callTool(
 		fullName: string,
 		args: Record<string, unknown>,
+		options: { signal?: AbortSignal; timeoutMs?: number } = {},
 	): Promise<unknown> {
 		const entry = this.toolsMap.get(fullName);
 		if (!entry) throw new Error(`Unknown MCP tool: ${fullName}`);
@@ -192,7 +197,7 @@ export class MCPServerManager {
 		const client = this.clients.get(entry.server);
 		if (!client) throw new Error(`MCP server not connected: ${entry.server}`);
 
-		return client.callTool(entry.tool.name, args);
+		return client.callTool(entry.tool.name, args, options);
 	}
 
 	getStatus(): MCPServerStatus[] {
@@ -202,11 +207,6 @@ export class MCPServerManager {
 				.filter(([, v]) => v.server === name)
 				.map(([k]) => k);
 			const config = client.serverConfig;
-			const key = this.oauthKey(name);
-			const _authenticated = this.oauthStore
-				.isAuthenticated(key)
-				.catch(() => false);
-
 			statuses.push({
 				name,
 				connected: client.connected,
@@ -259,6 +259,11 @@ export class MCPServerManager {
 
 	getServerNames(): string[] {
 		return Array.from(this.clients.keys());
+	}
+
+	/** The configuration a running server was started with. */
+	getServerConfig(name: string): MCPServerConfig | undefined {
+		return this.serverConfigs.get(name) ?? this.clients.get(name)?.serverConfig;
 	}
 
 	isServerConnected(name: string): boolean {
@@ -469,5 +474,6 @@ export class MCPServerManager {
 		}
 		this.pendingAuth.delete(name);
 		this.startupErrors.delete(name);
+		this.serverConfigs.delete(name);
 	}
 }

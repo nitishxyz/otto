@@ -1,10 +1,10 @@
-import type { ProviderName } from '@ottocode/sdk';
+import type { ProviderId } from '@ottocode/sdk';
 
 export type AgentConfig = {
 	name: string;
 	prompt: string;
 	toolConfig: Required<AgentToolGroups>;
-	provider?: ProviderName;
+	provider?: ProviderId;
 	model?: string;
 	description?: string;
 };

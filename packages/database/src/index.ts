@@ -1,13 +1,21 @@
 import { Database } from 'bun:sqlite';
 import { drizzle, type BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import {
-	CACHE_USAGE_NORMALIZATION_MARKER,
-	loadConfig,
-	logger,
-	type OttoConfig,
-} from '@ottocode/sdk';
 import * as schema from './schema/index.ts';
 import { bundledMigrations } from './runtime/migrations-bundled.ts';
+import { CACHE_USAGE_NORMALIZATION_MARKER } from './runtime/markers.ts';
+
+export { CACHE_USAGE_NORMALIZATION_MARKER } from './runtime/markers.ts';
+
+export type DatabasePathResolver = (
+	projectRootInput?: string,
+) => string | Promise<string>;
+
+let databasePathResolver: DatabasePathResolver | undefined;
+
+/** Registers the host's project/config policy for the legacy getDb accessor. */
+export function setDatabasePathResolver(resolver: DatabasePathResolver): void {
+	databasePathResolver = resolver;
+}
 
 const dbCache: Map<string, BunSQLiteDatabase<typeof schema>> = new Map();
 const migratedPaths = new Set<string>();
@@ -25,12 +33,15 @@ export function getDbFilePath(db: unknown): string | undefined {
 }
 
 export async function getDb(projectRootInput?: string) {
-	const cfg = await loadConfig(projectRootInput);
-	return getDbForConfig(cfg);
+	if (!databasePathResolver) {
+		throw new Error(
+			'getDb requires a registered database path resolver; initialize SDK config or use getDbByPath/getDbForConfig.',
+		);
+	}
+	return getDbByPath(await databasePathResolver(projectRootInput));
 }
 
-export async function getDbForConfig(cfg: OttoConfig) {
-	// Data dir is ensured by loadConfig() already.
+export async function getDbForConfig(cfg: { paths: { dbPath: string } }) {
 	return getDbByPath(cfg.paths.dbPath);
 }
 
@@ -96,7 +107,7 @@ export async function getDbByPath(dbPath: string) {
 			}
 			migratedPaths.add(dbPath);
 		} catch (error) {
-			logger.error('Local database migration failed', error);
+			sqlite.close();
 			throw error;
 		}
 	}

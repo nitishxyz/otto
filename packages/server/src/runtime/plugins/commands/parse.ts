@@ -81,12 +81,7 @@ export function parsePluginCommandArgs(
 	definition: PluginCommand,
 ): ParsedPluginCommandArgs {
 	const parameters = definition.parameters ?? {};
-	const values: Record<string, string | number | boolean> = {};
-	for (const [name, parameter] of Object.entries(parameters)) {
-		if (parameter.default !== undefined) {
-			values[name] = parameter.default;
-		}
-	}
+	const values = defaultParameterValues(definition);
 
 	const extraArgs: string[] = [];
 	const tokens = tokenizePluginCommandArgs(argsText);
@@ -152,6 +147,25 @@ export function parsePluginCommandArgs(
 		values[key] = coerced.value;
 	}
 
+	return finalizeParsedArgs(definition, values, extraArgs);
+}
+
+function defaultParameterValues(
+	definition: PluginCommand,
+): Record<string, string | number | boolean> {
+	const values: Record<string, string | number | boolean> = {};
+	for (const [name, parameter] of Object.entries(definition.parameters ?? {})) {
+		if (parameter.default !== undefined) values[name] = parameter.default;
+	}
+	return values;
+}
+
+function finalizeParsedArgs(
+	definition: PluginCommand,
+	values: Record<string, string | number | boolean>,
+	extraArgs: string[],
+): ParsedPluginCommandArgs {
+	const parameters = definition.parameters ?? {};
 	for (const [name, parameter] of Object.entries(parameters)) {
 		if (parameter.required && !(name in values)) {
 			return { ok: false, error: `Missing required argument: ${name}` };
@@ -168,6 +182,85 @@ export function parsePluginCommandArgs(
 	}
 
 	return { ok: true, values, extraArgs };
+}
+
+/**
+ * Validates structured (typed) arguments directly against the parameter
+ * definitions, without round-tripping through argument text. Values keep
+ * their exact content (including whitespace and quotes).
+ */
+export function validatePluginCommandTypedArgs(
+	definition: PluginCommand,
+	args: Record<string, string | number | boolean>,
+): ParsedPluginCommandArgs {
+	const parameters = definition.parameters ?? {};
+	const values = defaultParameterValues(definition);
+	const extraArgs: string[] = [];
+	for (const [key, value] of Object.entries(args)) {
+		const parameter = parameters[key];
+		if (!parameter) {
+			if (!definition.allowExtraArgs) {
+				return { ok: false, error: `Unknown argument: ${key}` };
+			}
+			extraArgs.push(
+				value === true
+					? `--${key}`
+					: `--${key}=${typeof value === 'string' ? value : String(value)}`,
+			);
+			continue;
+		}
+		const validated = validateTypedValue(parameter, value);
+		if (!validated.ok) return validated;
+		values[key] = validated.value;
+	}
+	return finalizeParsedArgs(definition, values, extraArgs);
+}
+
+function validateTypedValue(
+	parameter: NonNullable<PluginCommand['parameters']>[string],
+	value: string | number | boolean,
+):
+	| { ok: true; value: string | number | boolean }
+	| { ok: false; error: string } {
+	switch (parameter.type) {
+		case 'string':
+		case 'enum':
+			if (typeof value !== 'string') {
+				return coerceParameterValue(parameter, String(value));
+			}
+			if (!value.trim()) {
+				return { ok: false, error: 'Argument value cannot be empty' };
+			}
+			if (
+				parameter.type === 'enum' &&
+				parameter.values?.length &&
+				!parameter.values.includes(value)
+			) {
+				return {
+					ok: false,
+					error: `Invalid value for argument. Expected one of: ${parameter.values.join(', ')}`,
+				};
+			}
+			return { ok: true, value };
+		case 'number':
+			if (typeof value === 'number') {
+				return Number.isFinite(value)
+					? { ok: true, value }
+					: { ok: false, error: 'Argument value must be a number' };
+			}
+			if (typeof value === 'boolean') {
+				return { ok: false, error: 'Argument value must be a number' };
+			}
+			return coerceParameterValue(parameter, value);
+		case 'boolean':
+			if (typeof value === 'boolean') return { ok: true, value };
+			if (typeof value === 'number') {
+				return { ok: false, error: 'Argument value must be a boolean' };
+			}
+			return coerceParameterValue(parameter, value);
+		default:
+			return { ok: false, error: 'Unsupported parameter type' };
+	}
 }
 
 export function normalizePluginCommandRunInput(
@@ -196,15 +289,7 @@ export function normalizePluginCommandRunInput(
 	}
 
 	if (input.args && Object.keys(input.args).length > 0) {
-		const parts: string[] = [];
-		for (const [key, value] of Object.entries(input.args)) {
-			if (typeof value === 'boolean') {
-				parts.push(value ? `--${key}` : `--${key}=false`);
-				continue;
-			}
-			parts.push(`--${key}`, String(value));
-		}
-		const parsed = parsePluginCommandArgs(parts.join(' '), definition);
+		const parsed = validatePluginCommandTypedArgs(definition, input.args);
 		if (!parsed.ok) return parsed;
 		if (!input.extraArgs?.length) return parsed;
 		if (!definition.allowExtraArgs) {

@@ -1,35 +1,71 @@
 import { publish } from '../../../events/bus.ts';
-import { scopedMessageKey } from '../../projects/scope.ts';
+import { scopedMessageKey, scopedSessionKey } from '../../projects/scope.ts';
 import type { QueuedMessage, RunnerState } from './types.ts';
 
-// Global state for session queues.
+// Runner state keyed by project root + session id.
 const runners = new Map<string, RunnerState>();
+// Session id -> scoped runner keys, for callers that only know the session id.
+const sessionKeys = new Map<string, Set<string>>();
 
 // Track active abort controllers per MESSAGE (not session).
 const messageAbortControllers = new Map<string, AbortController>();
 
-export function getRunnerStateInternal(
+function resolveRunnerKey(
 	sessionId: string,
-): RunnerState | undefined {
-	return runners.get(sessionId);
+	projectRoot?: string,
+): string | undefined {
+	if (projectRoot) return scopedSessionKey(projectRoot, sessionId);
+	const keys = sessionKeys.get(sessionId);
+	if (!keys || keys.size === 0) return undefined;
+	if (keys.size > 1)
+		throw new Error('Ambiguous session queue: projectRoot is required');
+	return keys.values().next().value;
 }
 
-export function getOrCreateRunnerState(sessionId: string): RunnerState {
-	const existing = runners.get(sessionId);
+export function getRunnerStateInternal(
+	sessionId: string,
+	projectRoot?: string,
+): RunnerState | undefined {
+	const key = resolveRunnerKey(sessionId, projectRoot);
+	return key ? runners.get(key) : undefined;
+}
+
+export function getOrCreateRunnerState(
+	sessionId: string,
+	projectRoot?: string,
+): RunnerState {
+	const key = scopedSessionKey(projectRoot, sessionId);
+	const existing = runners.get(key);
 	if (existing) return existing;
 	const state: RunnerState = {
 		projectId: undefined,
-		projectRoot: undefined,
+		projectRoot,
 		queue: [],
 		running: false,
 		currentMessageId: null,
 	};
-	runners.set(sessionId, state);
+	runners.set(key, state);
+	const keys = sessionKeys.get(sessionId) ?? new Set<string>();
+	keys.add(key);
+	sessionKeys.set(sessionId, keys);
 	return state;
 }
 
-export function deleteRunnerState(sessionId: string): void {
-	runners.delete(sessionId);
+export function deleteRunnerState(
+	sessionId: string,
+	projectRoot?: string,
+	state?: RunnerState,
+): void {
+	const key = state
+		? Array.from(sessionKeys.get(sessionId) ?? []).find(
+				(candidate) => runners.get(candidate) === state,
+			)
+		: resolveRunnerKey(sessionId, projectRoot);
+	if (!key) return;
+	runners.delete(key);
+	const keys = sessionKeys.get(sessionId);
+	keys?.delete(key);
+	if (keys && keys.size === 0) sessionKeys.delete(sessionId);
 }
 
 export interface QueueStats {
@@ -105,9 +141,15 @@ export function abortAndDeleteMessageController(
 	return true;
 }
 
-export function publishQueueState(sessionId: string): void {
-	const state = runners.get(sessionId);
-	const queue = state?.queue ?? [];
+/** Publishes a queue snapshot; pass `state` when it was already removed. */
+export function publishQueueState(
+	sessionId: string,
+	projectRoot?: string,
+	stateOverride?: RunnerState,
+): void {
+	const state = stateOverride ?? getRunnerStateInternal(sessionId, projectRoot);
+	const removed = stateOverride !== undefined;
+	const queue = removed ? [] : (state?.queue ?? []);
 
 	const queuedMessages: QueuedMessage[] = queue.map((opts, index) => ({
 		messageId: opts.assistantMessageId,
@@ -118,12 +160,12 @@ export function publishQueueState(sessionId: string): void {
 		type: 'queue.updated',
 		sessionId,
 		projectId: state?.projectId,
-		projectRoot: state?.projectRoot,
+		projectRoot: state?.projectRoot ?? projectRoot,
 		payload: {
-			currentMessageId: state?.currentMessageId ?? null,
+			currentMessageId: removed ? null : (state?.currentMessageId ?? null),
 			queuedMessages,
 			queueLength: queue.length,
-			isRunning: state?.running ?? false,
+			isRunning: removed ? false : (state?.running ?? false),
 		},
 	});
 }

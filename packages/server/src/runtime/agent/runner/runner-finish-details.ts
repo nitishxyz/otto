@@ -1,9 +1,10 @@
 import { logger } from '@ottocode/sdk';
 import type { getDb } from '@ottocode/database';
 import { messages } from '@ottocode/database/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { toErrorMessage } from '../../errors/handling.ts';
 import type { RunOpts } from '../../session/queue.ts';
+import type { FinishEvent } from '../../stream/types.ts';
 import type { RunnerTextState } from './runner-text.ts';
 import type { RunnerToolObserverState } from './runner-tool-observer.ts';
 
@@ -12,29 +13,36 @@ type StreamFinishSource = {
 	rawFinishReason: PromiseLike<string | undefined>;
 };
 
-async function readStreamFinishReasons(result: StreamFinishSource): Promise<{
+async function settle<T>(value: PromiseLike<T> | undefined) {
+	if (!value) return undefined;
+	try {
+		return await value;
+	} catch {
+		return undefined;
+	}
+}
+
+export async function readStreamFinishReasons(
+	result: StreamFinishSource | undefined,
+	fin?: FinishEvent,
+): Promise<{
 	finishReason: string | undefined;
 	rawFinishReason: string | undefined;
 }> {
-	let finishReason: string | undefined;
-	try {
-		finishReason = await result.finishReason;
-	} catch {
-		finishReason = undefined;
-	}
-
-	let rawFinishReason: string | undefined;
-	try {
-		rawFinishReason = await result.rawFinishReason;
-	} catch {
-		rawFinishReason = undefined;
-	}
-
+	const finishReason =
+		fin?.finishReason ?? (await settle(result?.finishReason));
+	const rawFinishReason =
+		fin?.rawFinishReason ?? (await settle(result?.rawFinishReason));
 	return { finishReason, rawFinishReason };
 }
 
+/**
+ * Records stream diagnostics on a still-pending assistant message. Terminal
+ * status is owned by the turn executor and is not touched here.
+ */
 export async function persistRunnerStreamFinishDetails(args: {
-	result: StreamFinishSource;
+	result: StreamFinishSource | undefined;
+	fin?: FinishEvent;
 	opts: RunOpts;
 	db: Awaited<ReturnType<typeof getDb>>;
 	firstToolSeen: () => boolean;
@@ -46,6 +54,7 @@ export async function persistRunnerStreamFinishDetails(args: {
 }> {
 	const { finishReason, rawFinishReason } = await readStreamFinishReasons(
 		args.result,
+		args.fin,
 	);
 
 	try {
@@ -81,7 +90,12 @@ export async function persistRunnerStreamFinishDetails(args: {
 					},
 				}),
 			})
-			.where(eq(messages.id, args.opts.assistantMessageId));
+			.where(
+				and(
+					eq(messages.id, args.opts.assistantMessageId),
+					eq(messages.status, 'pending'),
+				),
+			);
 	} catch (error) {
 		logger.debug('[agent] failed to persist stream finish details', {
 			sessionId: args.opts.sessionId,

@@ -1,5 +1,7 @@
 # apply_patch Tool — Failure Analysis
 
+> **Superseded (October 2026):** the coverage gaps listed here now have regression tests in `tests/patch-apply.test.ts`. Remaining patch defects (partial multi-file commits, semantic partial-match fallbacks) are tracked in [harness-reliability-roadmap.md](harness-reliability-roadmap.md).
+
 ## Sessions Analyzed
 
 | # | Session | Model | Date |

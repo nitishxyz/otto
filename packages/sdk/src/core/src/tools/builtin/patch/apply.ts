@@ -1,5 +1,7 @@
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { applyValidatedPatch, type PatchApplyOptions } from './plan.ts';
+import { dirname } from 'node:path';
+import { resolveProjectPath as resolvePolicyProjectPath } from '../../policy/path-resolution.ts';
 
 import { applyHunkToLines } from './apply-hunk.ts';
 import type {
@@ -26,12 +28,7 @@ export function resolveProjectPath(
 	projectRoot: string,
 	filePath: string,
 ): string {
-	const fullPath = resolve(projectRoot, filePath);
-	const relativePath = relative(projectRoot, fullPath);
-	if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
-		throw new Error(`Patch path escapes project root: ${filePath}`);
-	}
-	return fullPath;
+	return resolvePolicyProjectPath(projectRoot, filePath);
 }
 
 async function applyAddOperation(
@@ -42,7 +39,10 @@ async function applyAddOperation(
 	await mkdir(dirname(target), { recursive: true });
 	const lines = [...operation.lines];
 	ensureTrailingNewline(lines);
-	await writeFile(target, joinLines(lines, '\n'), 'utf-8');
+	await writeFile(target, joinLines(lines, '\n'), {
+		encoding: 'utf-8',
+		flag: 'wx',
+	});
 
 	const appliedHunk: AppliedPatchHunk = {
 		header: {},
@@ -338,7 +338,20 @@ async function applyLineInsertOperation(
 export async function applyPatchOperations(
 	projectRoot: string,
 	operations: PatchOperation[],
-	options: { useFuzzy: boolean; allowRejects: boolean },
+	options: PatchApplyOptions,
+): Promise<PatchApplicationResult> {
+	return applyValidatedPatch(
+		projectRoot,
+		operations,
+		options,
+		applyStagedOperations,
+	);
+}
+
+async function applyStagedOperations(
+	projectRoot: string,
+	operations: PatchOperation[],
+	options: PatchApplyOptions,
 ): Promise<PatchApplicationResult> {
 	const applied: AppliedPatchOperation[] = [];
 	const rejected: RejectedPatch[] = [];

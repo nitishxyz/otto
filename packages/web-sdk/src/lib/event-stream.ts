@@ -179,6 +179,12 @@ class EventStreamMultiplexer {
 					type: event.type,
 					payload,
 				});
+			} else if (event.type === 'stream.payload.truncated') {
+				// An omitted envelope can lose its session id. All attached sessions
+				// must recover from persistence rather than applying partial content.
+				for (const key of this.entries.keys()) {
+					this.emit(key, { id: event.id, type: event.type, payload });
+				}
 			} else {
 				this.emit(CLIENT_EVENTS_KEY, {
 					id: event.id,

@@ -2,15 +2,22 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import type { DB } from '@ottocode/database';
 import { messageParts, messages, subagents } from '@ottocode/database/schema';
 import { logger } from '@ottocode/sdk';
+import { attemptOf, terminateSubagentAttempt } from './transitions.ts';
 import type { SubagentRecord } from './types.ts';
 
 /**
- * Finalizes the sub-agent record for a child session whose run just finished.
- * Returns the updated record, or undefined when the session is not a running sub-agent.
+ * Finalizes the current running attempt of a child session whose run just
+ * finished. The finished assistant message is identified explicitly (by id
+ * when known, otherwise the newest assistant message). Nothing is finalized
+ * while that message is still pending (a queued follow-up has not run yet).
+ * The terminal write is compare-and-set against the attempt version, so a
+ * concurrent stop or follow-up wins and this call becomes a no-op.
+ * Returns the updated record, or undefined when nothing was finalized.
  */
 export async function finalizeSubagentForChildSession(
 	db: DB,
 	childSessionId: string,
+	options: { finishedMessageId?: string } = {},
 ): Promise<SubagentRecord | undefined> {
 	const rows = await db
 		.select()
@@ -21,19 +28,41 @@ export async function finalizeSubagentForChildSession(
 				eq(subagents.status, 'running'),
 			),
 		)
+		.orderBy(desc(subagents.createdAt))
 		.limit(1);
-	if (!rows.length) return undefined;
 	const record = rows[0];
+	if (!record) return undefined;
+	const attempt = attemptOf(record);
+	if (
+		options.finishedMessageId &&
+		record.attemptId &&
+		record.attemptId !== options.finishedMessageId
+	)
+		return undefined;
 
-	const lastAssistant = await db
+	const [assistantMessage] = await db
 		.select()
 		.from(messages)
-		.where(eq(messages.sessionId, childSessionId))
+		.where(
+			and(
+				eq(messages.sessionId, childSessionId),
+				eq(messages.role, 'assistant'),
+				...(options.finishedMessageId
+					? [eq(messages.id, options.finishedMessageId)]
+					: []),
+			),
+		)
 		.orderBy(desc(messages.createdAt))
-		.limit(5);
-	const assistantMessage = lastAssistant.find(
-		(message) => message.role === 'assistant',
-	);
+		.limit(1);
+	if (assistantMessage?.status === 'pending') {
+		logger.debug('[subagent] finalize skipped: assistant message pending', {
+			subagentId: record.id,
+			messageId: assistantMessage.id,
+		});
+		return undefined;
+	}
+	if (record.attemptId && assistantMessage?.id !== record.attemptId)
+		return undefined;
 
 	let summary = '';
 	let failed = false;
@@ -56,19 +85,28 @@ export async function finalizeSubagentForChildSession(
 	}
 
 	const status = failed ? 'failed' : 'completed';
-	const updatedAt = Math.max(Date.now(), record.updatedAt + 1);
-	await db
-		.update(subagents)
-		.set({ status, summary, reported: false, updatedAt })
-		.where(eq(subagents.id, record.id));
+	const updated = terminateSubagentAttempt(db, attempt, {
+		status,
+		summary,
+		reported: false,
+		finishedMessageId: assistantMessage?.id ?? null,
+	});
+	if (!updated) {
+		logger.info('[subagent] finalize superseded by concurrent transition', {
+			subagentId: record.id,
+			attemptSeq: attempt.attemptSeq,
+		});
+		return undefined;
+	}
 
 	logger.info('[subagent] finalized', {
 		subagentId: record.id,
 		parentSessionId: record.parentSessionId,
 		status,
+		messageId: assistantMessage?.id,
 	});
 
-	return { ...record, status, summary, reported: false, updatedAt };
+	return updated;
 }
 
 async function extractAssistantText(

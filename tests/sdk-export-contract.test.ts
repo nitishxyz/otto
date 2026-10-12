@@ -1,61 +1,63 @@
-import { describe, expect, test } from 'bun:test';
+import { expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
-type ExportTarget = string | Record<string, string>;
+type ExportTarget =
+	| string
+	| null
+	| { [condition: string]: ExportTarget }
+	| ExportTarget[];
 
-const sdkDirectory = join(import.meta.dir, '..', 'packages', 'sdk');
-
-function packageSpecifier(exportPath: string): string {
-	return exportPath === '.'
-		? '@ottocode/sdk'
-		: `@ottocode/sdk${exportPath.slice(1)}`;
+function targets(value: ExportTarget): string[] {
+	if (value === null) return [];
+	if (typeof value === 'string') return [value];
+	return Object.values(value).flatMap(targets);
 }
 
-describe('@ottocode/sdk export contract', () => {
-	test('every local export target exists and imports through Bun', async () => {
-		const packageJson = JSON.parse(
-			await readFile(join(sdkDirectory, 'package.json'), 'utf8'),
-		) as { exports: Record<string, ExportTarget> };
+const root = resolve(import.meta.dir, '..');
 
-		for (const [exportPath, targetValue] of Object.entries(
-			packageJson.exports,
-		)) {
-			const targets =
-				typeof targetValue === 'string'
-					? [targetValue]
-					: [...new Set(Object.values(targetValue))];
-
-			for (const target of targets) {
+test('every published workspace package export target exists and resolves', async () => {
+	for (const manifest of new Bun.Glob(
+		'{packages,apps}/*/package.json',
+	).scanSync({ cwd: root, onlyFiles: true })) {
+		const directory = join(root, dirname(manifest));
+		const pkg = JSON.parse(await readFile(join(root, manifest), 'utf8')) as {
+			private?: boolean;
+			name: string;
+			exports?: Record<string, ExportTarget>;
+		};
+		if (pkg.private || !pkg.exports) continue;
+		for (const [exportPath, value] of Object.entries(pkg.exports)) {
+			for (const target of new Set(targets(value))) {
 				expect(target.startsWith('./')).toBe(true);
-
 				if (!target.includes('*')) {
-					expect(existsSync(join(sdkDirectory, target))).toBe(true);
-					await import(packageSpecifier(exportPath));
+					expect(existsSync(join(directory, target))).toBe(true);
+					expect(
+						Bun.resolveSync(
+							`${pkg.name}${exportPath === '.' ? '' : exportPath.slice(1)}`,
+							root,
+						),
+					).toBeTruthy();
 					continue;
 				}
-
-				const [targetPrefix, targetSuffix = ''] = target.split('*');
-				const [exportPrefix, exportSuffix = ''] = exportPath.split('*');
 				const matches = Array.from(
 					new Bun.Glob(target.slice(2)).scanSync({
-						cwd: sdkDirectory,
+						cwd: directory,
 						onlyFiles: true,
 					}),
 				);
 				expect(matches.length).toBeGreaterThan(0);
-
+				const [prefix, suffix = ''] = target.split('*');
 				for (const match of matches) {
-					const localTarget = `./${match}`;
-					const wildcardValue = localTarget.slice(
-						targetPrefix.length,
-						targetSuffix ? -targetSuffix.length : undefined,
+					const wildcard = `./${match}`.slice(
+						prefix.length,
+						suffix ? -suffix.length : undefined,
 					);
-					const resolvedExport = `${exportPrefix}${wildcardValue}${exportSuffix}`;
-					await import(packageSpecifier(resolvedExport));
+					const specifier = `${pkg.name}${exportPath.slice(1).replace('*', wildcard)}`;
+					expect(Bun.resolveSync(specifier, root)).toBeTruthy();
 				}
 			}
 		}
-	});
+	}
 });

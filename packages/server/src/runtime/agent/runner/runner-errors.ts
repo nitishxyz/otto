@@ -1,25 +1,15 @@
 import type { getDb } from '@ottocode/database';
-import { messages, sessions } from '@ottocode/database/schema';
+import { sessions } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
-import { publish } from '../../../events/bus.ts';
-import { publishAssistantMessageError } from '../../errors/assistant-message-error.ts';
-import { isContextOverflowError } from '../../errors/context-overflow.ts';
-import { toErrorPayload } from '../../errors/handling.ts';
 import {
 	runAutoCompactionFlow,
 	shouldAutoCompactAfterTurn,
 	shouldAutoCompactBeforeOverflow,
 	shouldStopTurnForAutoCompact,
 } from '../../message/compaction.ts';
-import type {
-	updateMessageTokensIncremental,
-	updateSessionTokensIncremental,
-} from '../../session/db-operations.ts';
-import { enqueueAssistantRun, type RunOpts } from '../../session/queue.ts';
-import { recoverContextOverflow } from './runner-context-overflow.ts';
-
-type UpdateSessionTokensIncremental = typeof updateSessionTokensIncremental;
-type UpdateMessageTokensIncremental = typeof updateMessageTokensIncremental;
+import type { RunOpts } from '../../session/queue.ts';
+import { isRunCancelled, scheduleContinuation } from '../turn/continuation.ts';
+import type { RunSessionLoop } from '../turn/types.ts';
 
 export async function shouldPreemptivelyAutoCompact(
 	db: Awaited<ReturnType<typeof getDb>>,
@@ -84,10 +74,10 @@ export async function autoCompactSessionAfterTurn(args: {
 	threshold: number | null | undefined;
 	turnStoppedForCompaction: boolean;
 	lastStepUsage?: StepUsageLike['usage'];
-	runSessionLoop: (sessionId: string) => Promise<void>;
+	runSessionLoop: RunSessionLoop;
 }): Promise<boolean> {
 	const { db, opts } = args;
-	if (opts.abortSignal?.aborted) return false;
+	if (isRunCancelled(opts)) return false;
 
 	const sessionRows = await db
 		.select({ currentContextTokens: sessions.currentContextTokens })
@@ -112,97 +102,15 @@ export async function autoCompactSessionAfterTurn(args: {
 	});
 
 	if (succeeded && args.turnStoppedForCompaction) {
-		const retryMessageId = crypto.randomUUID();
-		await db.insert(messages).values({
-			id: retryMessageId,
-			sessionId: opts.sessionId,
-			role: 'assistant',
-			status: 'pending',
-			agent: opts.agent,
-			provider: opts.provider,
-			model: opts.model,
-			createdAt: Date.now(),
+		await scheduleContinuation({
+			db,
+			opts,
+			kind: 'auto-compact',
+			counters: { compactionRetries: (opts.compactionRetries ?? 0) + 1 },
+			runSessionLoop: args.runSessionLoop,
+			front: true,
 		});
-
-		publish({
-			type: 'message.created',
-			sessionId: opts.sessionId,
-			payload: {
-				id: retryMessageId,
-				role: 'assistant',
-				agent: opts.agent,
-				provider: opts.provider,
-				model: opts.model,
-			},
-		});
-
-		const {
-			abortSignal: _abortSignal,
-			queuedAt: _queuedAt,
-			...retryOpts
-		} = opts;
-		enqueueAssistantRun(
-			{
-				...retryOpts,
-				assistantMessageId: retryMessageId,
-				compactionRetries: (opts.compactionRetries ?? 0) + 1,
-			},
-			args.runSessionLoop,
-			{ front: true },
-		);
 	}
 
 	return true;
-}
-
-export async function handleRunnerError(args: {
-	err: unknown;
-	opts: RunOpts;
-	db: Awaited<ReturnType<typeof getDb>>;
-	updateSessionTokensIncremental: UpdateSessionTokensIncremental;
-	updateMessageTokensIncremental: UpdateMessageTokensIncremental;
-	runSessionLoop: (sessionId: string) => Promise<void>;
-	nextPartIndex?: () => number | Promise<number>;
-}): Promise<'handled' | 'rethrow'> {
-	const { err, opts, db } = args;
-	const payload = toErrorPayload(err);
-
-	if (isContextOverflowError(err) && !opts.isCompactCommand) {
-		try {
-			const recovery = await recoverContextOverflow({
-				db,
-				opts,
-				runSessionLoop: args.runSessionLoop,
-			});
-			if (recovery !== 'failed') return 'handled';
-		} catch {}
-	}
-
-	try {
-		await args.updateSessionTokensIncremental(
-			{ inputTokens: 0, outputTokens: 0 },
-			undefined,
-			opts,
-			db,
-		);
-		await args.updateMessageTokensIncremental(
-			{ inputTokens: 0, outputTokens: 0 },
-			undefined,
-			opts,
-			db,
-		);
-	} catch {}
-
-	await publishAssistantMessageError({
-		db,
-		opts,
-		error: {
-			message: payload.message,
-			type: payload.type,
-			details: payload.details,
-			isAborted: false,
-		},
-		nextPartIndex: args.nextPartIndex,
-	});
-	return 'rethrow';
 }

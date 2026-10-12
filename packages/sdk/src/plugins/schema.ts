@@ -3,7 +3,8 @@ import { z } from 'zod/v3';
 export const pluginNameSchema = z
 	.string()
 	.min(1)
-	.regex(/^[a-zA-Z0-9._-]+$/);
+	.regex(/^[a-zA-Z0-9._-]+$/)
+	.regex(/^(?!\.+$)/, { message: 'Name cannot consist only of dots' });
 
 export const pluginPlatformSchema = z.enum(['darwin', 'linux', 'win32']);
 

@@ -4,7 +4,13 @@ import {
 } from './descriptions.ts';
 import { loadAgentsConfig } from './config.ts';
 import { discoverAllAgents } from './discovery.ts';
-import { normalizeModel, normalizeProvider } from './normalize.ts';
+import { loadConfig, type ProviderId } from '@ottocode/sdk';
+import {
+	isBuiltInAgentProvider,
+	normalizeModel,
+	normalizeProvider,
+	resolveConfiguredAgentProvider,
+} from './normalize.ts';
 import {
 	defaultToolConfigForAgent,
 	mergeToolGroups,
@@ -19,6 +25,21 @@ import type {
 } from './types.ts';
 import { resolveAgentPrompt } from '../registry-prompts.ts';
 
+async function validateAgentProvider(
+	projectRoot: string,
+	provider: ProviderId | undefined,
+): Promise<ProviderId | undefined> {
+	if (!provider || isBuiltInAgentProvider(provider)) return provider;
+	try {
+		return resolveConfiguredAgentProvider(
+			provider,
+			await loadConfig(projectRoot),
+		);
+	} catch {
+		return undefined;
+	}
+}
+
 export async function resolveAgentConfig(
 	projectRoot: string,
 	name: string,
@@ -30,7 +51,10 @@ export async function resolveAgentConfig(
 	},
 ): Promise<AgentConfig> {
 	if (inlineConfig?.prompt) {
-		const provider = normalizeProvider(inlineConfig.provider);
+		const provider = await validateAgentProvider(
+			projectRoot,
+			normalizeProvider(inlineConfig.provider),
+		);
 		const model = normalizeModel(inlineConfig.model);
 		const toolConfig = normalizeRequiredToolGroups(
 			normalizeAgentToolConfig(inlineConfig.tools) ??
@@ -63,7 +87,10 @@ export async function resolveAgentConfig(
 		toolConfig = mergeToolGroups(toolConfig, appendTools) ?? toolConfig;
 	}
 	const normalizedToolConfig = normalizeRequiredToolGroups(toolConfig ?? {});
-	const provider = normalizeProvider(entry?.provider);
+	const provider = await validateAgentProvider(
+		projectRoot,
+		normalizeProvider(entry?.provider),
+	);
 	const model = normalizeModel(entry?.model);
 	const description =
 		normalizeAgentDescription(entry?.description) ??

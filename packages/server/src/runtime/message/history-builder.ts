@@ -1,6 +1,4 @@
 import type { getDb } from '@ottocode/database';
-import { messages, messageParts, sessions } from '@ottocode/database/schema';
-import { asc, eq, inArray } from 'drizzle-orm';
 import type { ModelMessage } from 'ai';
 import {
 	parseRecipeInvocation,
@@ -11,27 +9,17 @@ import { ToolHistoryTracker } from './tool-history-tracker.ts';
 import { appendAssistantHistoryEntries } from './history/assistant-parts.ts';
 import { enforceModelHistoryBudget } from './history/budget.ts';
 import { findQueuedUserMessageIds } from './history/queue.ts';
-import { findSupersededReadPartIds } from './history/read-compaction.ts';
 import {
 	buildUserModelParts,
 	findLatestUserImageMessageId,
 } from './history/user-parts.ts';
 import type { MessagePartRow } from './history/types.ts';
-
-function groupPartsByMessageId(
-	parts: MessagePartRow[],
-): Map<string, MessagePartRow[]> {
-	const partsByMessageId = new Map<string, MessagePartRow[]>();
-	for (const part of parts) {
-		const existing = partsByMessageId.get(part.messageId);
-		if (existing) {
-			existing.push(part);
-			continue;
-		}
-		partsByMessageId.set(part.messageId, [part]);
-	}
-	return partsByMessageId;
-}
+import {
+	loadSessionMessages,
+	loadSessionPartsByMessageId,
+	readCheckpointBoundary,
+	splitAtCheckpoint,
+} from './session-order.ts';
 
 function shouldSkipAssistantMessage(args: {
 	status: string;
@@ -58,20 +46,24 @@ function readUserTextPart(parts: MessagePartRow[]): string | null {
 	return null;
 }
 
-async function shouldExcludeRecipeInvocationFromHistory(args: {
-	projectRoot?: string;
-	parts: MessagePartRow[];
-}): Promise<boolean> {
-	if (!args.projectRoot) return false;
-	const text = readUserTextPart(args.parts);
-	if (!text) return false;
-	const invocation = parseRecipeInvocation(text);
-	if (!invocation) return false;
-	const recipe = await resolveInvokableRecipe(
-		args.projectRoot,
-		invocation.name,
-	);
-	return recipe ? !recipe.includeInHistory : false;
+/** Resolves each distinct recipe invocation once per history build. */
+function createRecipeHistoryFilter(projectRoot?: string) {
+	const decisions = new Map<string, Promise<boolean>>();
+	return (parts: MessagePartRow[]): Promise<boolean> => {
+		if (!projectRoot) return Promise.resolve(false);
+		const text = readUserTextPart(parts);
+		if (!text) return Promise.resolve(false);
+		const invocation = parseRecipeInvocation(text);
+		if (!invocation) return Promise.resolve(false);
+		let decision = decisions.get(invocation.name);
+		if (!decision) {
+			decision = resolveInvokableRecipe(projectRoot, invocation.name).then(
+				(recipe) => (recipe ? !recipe.includeInHistory : false),
+			);
+			decisions.set(invocation.name, decision);
+		}
+		return decision;
+	};
 }
 
 function readToolPartIdentity(
@@ -137,51 +129,42 @@ export async function buildHistoryMessages(
 	currentMessageId?: string,
 	options?: { projectRoot?: string },
 ): Promise<ModelMessage[]> {
-	let rows = await db
-		.select()
-		.from(messages)
-		.where(eq(messages.sessionId, sessionId))
-		.orderBy(asc(messages.createdAt));
-	const sessionRows = await db
-		.select({ compactionMessageId: sessions.compactionMessageId })
-		.from(sessions)
-		.where(eq(sessions.id, sessionId))
-		.limit(1);
-	const compactionMessageId = sessionRows[0]?.compactionMessageId;
-	if (compactionMessageId) {
-		const checkpointIndex = rows.findIndex(
-			(message) => message.id === compactionMessageId,
-		);
-		if (checkpointIndex >= 0) rows = rows.slice(checkpointIndex + 1);
-	}
+	const [allRows, boundary] = await Promise.all([
+		loadSessionMessages(db, sessionId),
+		readCheckpointBoundary(db, sessionId),
+	]);
+	// History resumes after the summarized-through boundary; the summary
+	// message itself is never replayed (its content lives in the system prompt).
+	const { after: rows, boundaryRow } = splitAtCheckpoint(allRows, boundary);
+	const partsByMessageId = await loadSessionPartsByMessageId(
+		db,
+		sessionId,
+		boundaryRow?.sequence,
+	);
 	const queuedAssistantMessageIds = new Set(
-		getQueueState(sessionId)?.queuedMessages.map((item) => item.messageId) ??
-			[],
+		getQueueState(
+			sessionId,
+			options?.projectRoot ?? boundary.projectPath ?? undefined,
+		)?.queuedMessages.map((item) => item.messageId) ?? [],
 	);
 	const queuedUserMessageIds = findQueuedUserMessageIds(
 		rows,
 		queuedAssistantMessageIds,
 	);
-	const messageIds = rows.map((row) => row.id);
-	const allParts = messageIds.length
-		? await db
-				.select()
-				.from(messageParts)
-				.where(inArray(messageParts.messageId, messageIds))
-				.orderBy(asc(messageParts.messageId), asc(messageParts.index))
-		: [];
-	const partsByMessageId = groupPartsByMessageId(allParts);
 	const orderedParts = rows.flatMap(
 		(row) => partsByMessageId.get(row.id) ?? [],
 	);
-	const supersededReadPartIds = findSupersededReadPartIds(orderedParts);
+	// Supersession is computed over stored parts before model conversion.
+	const toolHistory = ToolHistoryTracker.fromParts(orderedParts);
 	const latestUserImageMessageId = findLatestUserImageMessageId(
 		rows,
 		partsByMessageId,
 	);
+	const excludeRecipeInvocation = createRecipeHistoryFilter(
+		options?.projectRoot,
+	);
 
 	const history: ModelMessage[] = [];
-	const toolHistory = new ToolHistoryTracker();
 	let skipNextAssistantMessage = false;
 
 	for (const message of rows) {
@@ -211,21 +194,15 @@ export async function buildHistoryMessages(
 		}
 
 		if (message.role === 'user') {
-			if (
-				await shouldExcludeRecipeInvocationFromHistory({
-					projectRoot: options?.projectRoot,
-					parts,
-				})
-			) {
+			if (await excludeRecipeInvocation(parts)) {
 				skipNextAssistantMessage = true;
 				continue;
 			}
 
-			const userParts = await buildUserModelParts({
+			const userParts = buildUserModelParts({
 				message,
 				parts,
 				latestUserImageMessageId,
-				projectRoot: options?.projectRoot,
 			});
 			if (userParts.length) {
 				history.push({ role: 'user', content: userParts });
@@ -237,7 +214,6 @@ export async function buildHistoryMessages(
 			await appendAssistantHistoryEntries({
 				history,
 				parts,
-				supersededReadPartIds,
 				toolHistory,
 			});
 		}

@@ -21,6 +21,7 @@ beforeAll(async () => {
 			makeSession('old-main', 'main'),
 			makeSession('old-child', 'subagent'),
 			makeSession('current-main', 'main'),
+			makeSession('current-child', 'subagent'),
 		]);
 	await db
 		.insert(messages)
@@ -50,7 +51,7 @@ beforeAll(async () => {
 		{
 			id: 'current-running-subagent',
 			parentSessionId: 'current-main',
-			childSessionId: 'old-child',
+			childSessionId: 'current-child',
 			agent: 'plan',
 			task: 'Inspect current work',
 			status: 'running',

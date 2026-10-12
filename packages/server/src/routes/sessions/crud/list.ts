@@ -71,6 +71,7 @@ export function registerListSessionsRoute(app: Hono) {
 			const normalized = page.map((row) => {
 				const normalizedSession = normalizeSessionRow(row, {
 					includeRunning: true,
+					projectRoot: cfg.projectRoot,
 				});
 				const sessionWithRunningDescendants = runningTreeIds.has(row.id)
 					? { ...normalizedSession, isRunning: true }

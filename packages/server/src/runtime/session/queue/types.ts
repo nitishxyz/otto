@@ -27,6 +27,7 @@ export type RunOpts = {
 	omitHistory?: boolean;
 	isCompactCommand?: boolean;
 	compactionContext?: string;
+	compactionThroughMessageId?: string;
 	additionalPromptMessages?: Array<{
 		role: 'system' | 'user';
 		content: string;

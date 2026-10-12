@@ -20,14 +20,25 @@ export async function reportFinishedShellJobs(
 	cfg: OttoConfig,
 	sessionId: string,
 ): Promise<boolean> {
-	const state = getRunnerState(sessionId);
+	const projectRoot = cfg.projectRoot;
+	const state = getRunnerState(sessionId, projectRoot);
 	if (state && (state.running || state.queue.length > 0)) return false;
 
-	const jobs = claimFinishedShellJobs(sessionId);
+	const claimed = claimFinishedShellJobs(sessionId);
+	const jobs = claimed.filter((job) => job.projectRoot === projectRoot);
+	releaseClaimedShellJobs(
+		claimed
+			.filter((job) => job.projectRoot !== projectRoot)
+			.map((job) => job.id),
+	);
 	if (!jobs.length) return false;
 	const jobIds = jobs.map((job) => job.id);
 	try {
-		const session = await getSessionById({ db, sessionId });
+		const session = await getSessionById({
+			db,
+			sessionId,
+			projectPath: projectRoot,
+		});
 		if (!session) {
 			releaseClaimedShellJobs(jobIds);
 			return false;

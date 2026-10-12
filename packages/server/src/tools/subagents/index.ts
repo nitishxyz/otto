@@ -171,10 +171,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 								record.summary,
 						);
 						if (seen.length) {
-							await markSubagentsReported(
-								db,
-								seen.map((record) => record.id),
-							);
+							await markSubagentsReported(db, seen);
 						}
 						return {
 							ok: true,
@@ -301,6 +298,7 @@ export function buildSubagentTool(projectRoot: string, sessionId: string) {
 						const db = await getDb(projectRoot);
 						const result = await stopSubagent({
 							db,
+							projectRoot,
 							parentSessionId: sessionId,
 							subagentId,
 						});

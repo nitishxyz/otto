@@ -1,15 +1,24 @@
 import { convertToModelMessages, type ModelMessage, type UIMessage } from 'ai';
 import { stripToolResultArtifactsForModel } from '../../../tools/adapter/results.ts';
 import type { ToolHistoryTracker } from '../tool-history-tracker.ts';
-import { getReadCompactedReason } from './read-compaction.ts';
 import type { MessagePartRow, ToolResultRecord } from './types.ts';
 
-function collectToolResultsById(
-	parts: MessagePartRow[],
-): Map<string, ToolResultRecord> {
+/** Shown when a tool result was hidden by compaction or pruning. */
+export const COMPACTED_TOOL_RESULT_TEXT =
+	'[Tool result omitted by context compaction. The call completed; its output is no longer shown. Re-run the tool only if the output is needed again.]';
+
+/** Shown when a tool call has no stored result at all. */
+export const MISSING_TOOL_RESULT_TEXT =
+	'Error: The tool execution was interrupted or failed to return a result. You may need to retry this operation.';
+
+function collectToolResultsById(parts: MessagePartRow[]): {
+	results: Map<string, ToolResultRecord>;
+	compactedCallIds: Set<string>;
+} {
 	const toolResultsById = new Map<string, ToolResultRecord>();
+	const compactedCallIds = new Set<string>();
 	for (const part of parts) {
-		if (part.type !== 'tool_result' || part.compactedAt) continue;
+		if (part.type !== 'tool_result') continue;
 
 		try {
 			const obj = JSON.parse(part.content ?? '{}') as {
@@ -17,23 +26,30 @@ function collectToolResultsById(
 				callId?: string;
 				result?: unknown;
 			};
-			if (obj.callId) {
-				toolResultsById.set(obj.callId, {
-					name: obj.name ?? 'tool',
-					callId: obj.callId,
-					partId: part.id,
-					result: obj.result,
-				});
+			const callId = obj.callId ?? part.toolCallId ?? undefined;
+			if (!callId) continue;
+			if (part.compactedAt) {
+				compactedCallIds.add(callId);
+				continue;
 			}
-		} catch {}
+			toolResultsById.set(callId, {
+				name: obj.name ?? 'tool',
+				callId,
+				partId: part.id,
+				result: obj.result,
+			});
+		} catch {
+			if (part.compactedAt && part.toolCallId) {
+				compactedCallIds.add(part.toolCallId);
+			}
+		}
 	}
-	return toolResultsById;
+	return { results: toolResultsById, compactedCallIds };
 }
 
 export async function appendAssistantHistoryEntries(args: {
 	history: ModelMessage[];
 	parts: MessagePartRow[];
-	supersededReadPartIds: Set<string>;
 	toolHistory: ToolHistoryTracker;
 }) {
 	const assistantParts: UIMessage['parts'] = [];
@@ -46,7 +62,9 @@ export async function appendAssistantHistoryEntries(args: {
 		);
 		assistantParts.length = 0;
 	};
-	const toolResultsById = collectToolResultsById(args.parts);
+	const { results: toolResultsById, compactedCallIds } = collectToolResultsById(
+		args.parts,
+	);
 
 	for (const part of args.parts) {
 		if (part.type === 'reasoning') continue;
@@ -58,7 +76,7 @@ export async function appendAssistantHistoryEntries(args: {
 				assistantParts,
 				part,
 				toolResultsById,
-				supersededReadPartIds: args.supersededReadPartIds,
+				compactedCallIds,
 				toolHistory: args.toolHistory,
 				flushAssistantParts,
 			});
@@ -85,7 +103,7 @@ async function appendAssistantToolCallPart(args: {
 	assistantParts: UIMessage['parts'];
 	part: MessagePartRow;
 	toolResultsById: Map<string, ToolResultRecord>;
-	supersededReadPartIds: Set<string>;
+	compactedCallIds: Set<string>;
 	toolHistory: ToolHistoryTracker;
 	flushAssistantParts: () => Promise<void>;
 }) {
@@ -101,26 +119,25 @@ async function appendAssistantToolCallPart(args: {
 		if (obj.name === 'finish') return;
 
 		const toolType = `tool-${obj.name}` as `tool-${string}`;
-		let result = args.toolResultsById.get(obj.callId);
-
+		const result = args.toolResultsById.get(obj.callId);
+		let modelResult: unknown;
 		if (!result) {
-			result = {
-				name: obj.name,
-				callId: obj.callId,
-				result:
-					'Error: The tool execution was interrupted or failed to return a result. You may need to retry this operation.',
-			};
+			modelResult = args.compactedCallIds.has(obj.callId)
+				? COMPACTED_TOOL_RESULT_TEXT
+				: MISSING_TOOL_RESULT_TEXT;
+		} else {
+			const supersession = args.toolHistory.get(obj.callId);
+			modelResult =
+				supersession?.kind === 'summary'
+					? supersession.summary
+					: stripToolResultArtifactsForModel(result.result, {
+							toolName: result.name,
+							compactedReason:
+								supersession?.kind === 'read'
+									? supersession.compactedReason
+									: undefined,
+						});
 		}
-
-		const compactedReason = getReadCompactedReason({
-			name: result.name,
-			partId: result.partId,
-			supersededReadPartIds: args.supersededReadPartIds,
-		});
-		const modelResult = stripToolResultArtifactsForModel(result.result, {
-			toolName: result.name,
-			compactedReason,
-		});
 		const part = {
 			type: toolType,
 			state: 'output-available',
@@ -128,13 +145,6 @@ async function appendAssistantToolCallPart(args: {
 			input: obj.args,
 			output: stringifyToolOutput(modelResult),
 		};
-
-		args.toolHistory.register(part, {
-			toolName: obj.name,
-			callId: obj.callId,
-			args: obj.args,
-			result: modelResult,
-		});
 
 		args.assistantParts.push(part as never);
 		await args.flushAssistantParts();

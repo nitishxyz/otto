@@ -51,12 +51,23 @@ class AsyncQueue<T> implements AsyncIterable<T> {
 	}> = [];
 	private finished = false;
 	private failure: unknown;
+	private bytes = 0;
+	constructor(private readonly cancel: (error: Error) => void) {}
 
 	push(value: T): void {
 		if (this.finished) return;
 		const waiter = this.waiters.shift();
 		if (waiter) waiter.resolve({ done: false, value });
-		else this.values.push(value);
+		else {
+			this.bytes += Buffer.byteLength(JSON.stringify(value));
+			if (this.values.length >= 512 || this.bytes > 16 * 1024 * 1024) {
+				const error = new Error('Native extension frame queue limit exceeded');
+				this.fail(error);
+				this.cancel(error);
+				return;
+			}
+			this.values.push(value);
+		}
 	}
 
 	end(): void {
@@ -71,6 +82,8 @@ class AsyncQueue<T> implements AsyncIterable<T> {
 		if (this.finished) return;
 		this.finished = true;
 		this.failure = error;
+		this.values = [];
+		this.bytes = 0;
 		for (const waiter of this.waiters.splice(0)) waiter.reject(error);
 	}
 
@@ -78,13 +91,21 @@ class AsyncQueue<T> implements AsyncIterable<T> {
 		return {
 			next: () => {
 				const value = this.values.shift();
-				if (value !== undefined) return Promise.resolve({ done: false, value });
+				if (value !== undefined) {
+					this.bytes -= Buffer.byteLength(JSON.stringify(value));
+					return Promise.resolve({ done: false, value });
+				}
 				if (this.failure) return Promise.reject(this.failure);
 				if (this.finished)
 					return Promise.resolve({ done: true, value: undefined });
 				return new Promise((resolve, reject) => {
 					this.waiters.push({ resolve, reject });
 				});
+			},
+			return: async () => {
+				this.cancel(new Error('Native extension consumer closed'));
+				this.values = [];
+				return { done: true, value: undefined };
 			},
 		};
 	}
@@ -154,11 +175,15 @@ async function readFrames(
 			buffer += decoder.decode(value, { stream: true });
 			let newline = buffer.indexOf('\n');
 			while (newline >= 0) {
+				if (newline > 16 * 1024 * 1024)
+					throw new Error('Native extension frame limit exceeded');
 				const line = buffer.slice(0, newline).trim();
 				buffer = buffer.slice(newline + 1);
 				if (line) onLine(line);
 				newline = buffer.indexOf('\n');
 			}
+			if (buffer.length > 16 * 1024 * 1024)
+				throw new Error('Native extension frame limit exceeded');
 		}
 		const final = `${buffer}${decoder.decode()}`.trim();
 		if (final) onLine(final);
@@ -175,6 +200,7 @@ class NativeExtensionHost {
 	constructor(private readonly key: string) {
 		this.subprocess = Bun.spawn(resolveHostCommand(), {
 			env: buildHostEnvironment(),
+			detached: true,
 			stdin: 'pipe',
 			stdout: 'pipe',
 			stderr: 'pipe',
@@ -188,9 +214,21 @@ class NativeExtensionHost {
 			this.dispose(error),
 		);
 		if (stderr && typeof stderr !== 'number') {
-			void new Response(stderr).text().then((output) => {
-				if (output.trim() && !this.closed) process.stderr.write(output);
-			});
+			void (async () => {
+				const reader = stderr.getReader();
+				let remaining = 64 * 1024;
+				try {
+					while (true) {
+						const { done, value } = await reader.read();
+						if (done) break;
+						if (remaining > 0 && !this.closed)
+							process.stderr.write(value.subarray(0, remaining));
+						remaining = Math.max(0, remaining - value.byteLength);
+					}
+				} finally {
+					reader.releaseLock();
+				}
+			})().catch((error) => this.dispose(error));
 		}
 		void this.subprocess.exited.then((exitCode) => {
 			if (!this.closed) {
@@ -204,9 +242,12 @@ class NativeExtensionHost {
 	call(options: ExecuteNativeExtensionOptions): AsyncIterable<StreamChunk> {
 		if (this.closed) throw new Error('Native extension host is closed');
 		const id = crypto.randomUUID();
-		const stream = new AsyncQueue<StreamChunk>();
+		const stream = new AsyncQueue<StreamChunk>((error) =>
+			this.cancelPending(id, error),
+		);
 		const timeout = setTimeout(() => {
-			this.dispose(
+			this.cancelPending(
+				id,
 				new Error(`Native extension timed out after ${options.timeoutMs}ms`),
 			);
 		}, options.timeoutMs);
@@ -218,7 +259,7 @@ class NativeExtensionHost {
 		};
 		if (options.signal) {
 			pending.onAbort = () =>
-				this.dispose(new Error('Native extension call aborted'));
+				this.cancelPending(id, new Error('Native extension call aborted'));
 			if (options.signal.aborted) {
 				clearTimeout(timeout);
 				stream.fail(new Error('Native extension call aborted'));
@@ -281,6 +322,14 @@ class NativeExtensionHost {
 		}
 	}
 
+	private cancelPending(id: string, error: Error): void {
+		const pending = this.pending.get(id);
+		if (!pending) return;
+		this.write({ type: 'cancel', id });
+		this.finishPending(id, pending);
+		pending.stream.fail(error);
+	}
+
 	private finishPending(id: string, pending: PendingCall): void {
 		this.pending.delete(id);
 		clearTimeout(pending.timeout);
@@ -292,7 +341,17 @@ class NativeExtensionHost {
 	dispose(error = new Error('Native extension host closed')): void {
 		if (this.closed) return;
 		this.closed = true;
-		this.subprocess.kill();
+		try {
+			process.kill(-this.subprocess.pid, 'SIGTERM');
+		} catch {
+			this.subprocess.kill();
+		}
+		const escalation = setTimeout(() => {
+			try {
+				process.kill(-this.subprocess.pid, 'SIGKILL');
+			} catch {}
+		}, 1000);
+		escalation.unref();
 		for (const [id, pending] of this.pending) {
 			this.finishPending(id, pending);
 			pending.stream.fail(error);

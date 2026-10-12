@@ -21,23 +21,10 @@ const state: DebugState = {
 };
 
 /**
- * Initialize debug state from environment
- */
-function initialize() {
-	if (state.runtimeOverride === null) {
-		state.enabled = false;
-	}
-	if (state.runtimeTraceOverride === null) {
-		state.traceEnabled = false;
-	}
-}
-
-/**
  * Check if debug mode is enabled
- * Considers both runtime override and environment variables
+ * Controlled by runtime configuration only.
  */
 export function isDebugEnabled(): boolean {
-	initialize();
 	return state.enabled;
 }
 
@@ -46,7 +33,6 @@ export function isDebugEnabled(): boolean {
  * Trace mode requires debug mode to be enabled
  */
 export function isTraceEnabled(): boolean {
-	initialize();
 	return state.enabled && state.traceEnabled;
 }
 
@@ -56,7 +42,7 @@ export function isDevtoolsEnabled(): boolean {
 
 /**
  * Enable or disable debug mode at runtime
- * Overrides environment variable settings
+ * Updates the runtime configuration.
  *
  * @param enabled - true to enable debug mode, false to disable
  */
@@ -77,7 +63,7 @@ export function setTraceEnabled(enabled: boolean): void {
 }
 
 /**
- * Reset debug state to environment defaults
+ * Reset debug state to disabled defaults
  */
 export function resetDebugState(): void {
 	state.runtimeOverride = null;
@@ -90,6 +76,5 @@ export function resetDebugState(): void {
  * Get current debug state (for testing/diagnostics)
  */
 export function getDebugState(): Readonly<DebugState> {
-	initialize();
 	return { ...state };
 }

@@ -6,24 +6,17 @@ import {
 	requireSessionAttention,
 	resolveSessionAttention,
 } from '../session/attention.ts';
+import { toolNamesWhere } from './definitions.ts';
 
 export type ToolApprovalMode = 'auto' | 'dangerous' | 'all' | 'yolo';
 
-export const DANGEROUS_TOOLS = new Set([
-	'shell',
-	'bash',
-	'edit',
-	'multiedit',
-	'write',
-	'copy_into',
-	'apply_patch',
-	'terminal',
-	'forge',
-	'git_commit',
-	'git_push',
-]);
+export const DANGEROUS_TOOLS = toolNamesWhere(
+	(definition) => definition.approval === 'dangerous',
+);
 
-export const SAFE_TOOLS = new Set(['progress_update', 'update_todos']);
+export const SAFE_TOOLS = toolNamesWhere(
+	(definition) => definition.approval === 'safe',
+);
 
 const APPROVAL_REQUIRED_EFFECTS = new Set<PluginToolEffect>([
 	'workspace-write',
@@ -54,6 +47,7 @@ export interface PendingApproval {
 	messageId: string;
 	resolve: (approved: boolean) => void;
 	createdAt: number;
+	timeoutId?: ReturnType<typeof setTimeout>;
 }
 
 const pendingApprovals = new Map<string, PendingApproval>();
@@ -121,6 +115,116 @@ export function skipsGuardApproval(mode?: ToolApprovalMode): boolean {
 	return mode === 'yolo';
 }
 
+export type ApprovalHandle = {
+	promise: Promise<boolean>;
+	/** Cancels the request: clears its timer and attention, resolves false. */
+	abort: () => void;
+};
+
+/**
+ * Starts one approval request and returns an abortable handle. The timeout
+ * timer and session attention are cleared on every resolution path.
+ */
+export function createApprovalRequest(args: {
+	sessionId: string;
+	messageId: string;
+	callId: string;
+	toolName: string;
+	args: unknown;
+	timeoutMs?: number;
+	projectRoot?: string;
+	signal?: AbortSignal;
+}): ApprovalHandle {
+	const { sessionId, messageId, callId, toolName, projectRoot } = args;
+	const key = scopedCallKey(projectRoot, callId);
+	let settle: (approved: boolean) => void = () => {};
+	const promise = new Promise<boolean>((resolve) => {
+		settle = resolve;
+	});
+	let onAbort: (() => void) | undefined;
+	const cleanup = () => {
+		if (onAbort) args.signal?.removeEventListener('abort', onAbort);
+	};
+	const approval: PendingApproval = {
+		projectRoot,
+		callId,
+		toolName,
+		args: args.args,
+		sessionId,
+		messageId,
+		resolve: (approved) => {
+			if (approval.timeoutId) clearTimeout(approval.timeoutId);
+			cleanup();
+			settle(approved);
+		},
+		createdAt: Date.now(),
+	};
+
+	const finishWithoutUser = (reason: 'timeout' | 'aborted') => {
+		if (pendingApprovals.get(key) !== approval) return;
+		pendingApprovals.delete(key);
+		resolveSessionAttention({
+			key: `tool-approval:${callId}`,
+			sessionId,
+			messageId,
+			projectRoot,
+		});
+		approval.resolve(false);
+		publish({
+			type: 'tool.approval.resolved',
+			sessionId,
+			projectRoot,
+			payload: {
+				callId,
+				toolName,
+				approved: false,
+				// The event protocol has no 'aborted' reason yet; an aborted
+				// request is reported as a rejection so clients dismiss it.
+				reason: reason === 'timeout' ? 'timeout' : 'user_rejected',
+			},
+		});
+	};
+
+	if (args.signal?.aborted) {
+		settle(false);
+		return { promise, abort: () => {} };
+	}
+
+	pendingApprovals.set(key, approval);
+	approval.timeoutId = setTimeout(
+		() => finishWithoutUser('timeout'),
+		args.timeoutMs ?? 120000,
+	);
+	const abort = () => finishWithoutUser('aborted');
+	if (args.signal) {
+		onAbort = abort;
+		args.signal.addEventListener('abort', onAbort, { once: true });
+	}
+	requireSessionAttention({
+		key: `tool-approval:${callId}`,
+		sessionId,
+		messageId,
+		projectRoot,
+		title: 'Permission required',
+		body: `The agent wants to use ${toolName.replaceAll('_', ' ')}.`,
+	});
+
+	publish({
+		type: 'tool.approval.required',
+		sessionId,
+		projectRoot,
+		payload: {
+			callId,
+			toolName,
+			args: args.args,
+			messageId,
+		},
+	});
+
+	if (args.signal?.aborted) abort();
+	return { promise, abort };
+}
+
 export async function requestApproval(
 	sessionId: string,
 	messageId: string,
@@ -130,65 +234,15 @@ export async function requestApproval(
 	timeoutMs = 120000,
 	projectRoot?: string,
 ): Promise<boolean> {
-	return new Promise((resolve) => {
-		const approval: PendingApproval = {
-			projectRoot,
-			callId,
-			toolName,
-			args,
-			sessionId,
-			messageId,
-			resolve,
-			createdAt: Date.now(),
-		};
-
-		const key = scopedCallKey(projectRoot, callId);
-		pendingApprovals.set(key, approval);
-		requireSessionAttention({
-			key: `tool-approval:${callId}`,
-			sessionId,
-			messageId,
-			projectRoot,
-			title: 'Permission required',
-			body: `The agent wants to use ${toolName.replaceAll('_', ' ')}.`,
-		});
-
-		publish({
-			type: 'tool.approval.required',
-			sessionId,
-			projectRoot,
-			payload: {
-				callId,
-				toolName,
-				args,
-				messageId,
-			},
-		});
-
-		setTimeout(() => {
-			if (pendingApprovals.has(key)) {
-				pendingApprovals.delete(key);
-				resolveSessionAttention({
-					key: `tool-approval:${callId}`,
-					sessionId,
-					messageId,
-					projectRoot,
-				});
-				resolve(false);
-				publish({
-					type: 'tool.approval.resolved',
-					sessionId,
-					projectRoot,
-					payload: {
-						callId,
-						toolName,
-						approved: false,
-						reason: 'timeout',
-					},
-				});
-			}
-		}, timeoutMs);
-	});
+	return createApprovalRequest({
+		sessionId,
+		messageId,
+		callId,
+		toolName,
+		args,
+		timeoutMs,
+		projectRoot,
+	}).promise;
 }
 
 export function resolveApproval(

@@ -3,12 +3,8 @@ import { logger } from '@ottocode/sdk';
 import type { Context } from 'hono';
 import type { Hono } from 'hono';
 import { subscribe } from '../events/bus.ts';
-import {
-	createSSEEncodingCache,
-	createSSEResponse,
-	encodeSSEComment,
-	encodeSSEEvent,
-} from '../events/sse.ts';
+import { createSSEResponse, encodeSSEComment } from '../events/sse.ts';
+import { encodeSessionStreamEvent } from '../events/stream-encoding.ts';
 import type { OttoEvent } from '../events/types.ts';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 import {
@@ -31,10 +27,6 @@ const sessionStreamResponseSchema = z.string().openapi({
 	description: STREAM_DESCRIPTION,
 });
 
-const encodeEvent = createSSEEncodingCache((evt: OttoEvent) =>
-	encodeSSEEvent(evt.type, evt.payload ?? {}),
-);
-
 async function handleSessionStream(c: Context) {
 	const project = await resolveRequestProject(c);
 	const sessionId = c.req.param('id');
@@ -55,7 +47,7 @@ async function handleSessionStream(c: Context) {
 		start({ send, onCleanup }) {
 			const write = (evt: OttoEvent) => {
 				if (evt.projectRoot && evt.projectRoot !== project.runtime.root) return;
-				send(encodeEvent(evt));
+				send(encodeSessionStreamEvent(evt));
 			};
 			onCleanup(subscribe(sessionId, write, project.runtime.root));
 			onCleanup(subscribe(sessionId, write));

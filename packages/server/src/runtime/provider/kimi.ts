@@ -1,5 +1,7 @@
 import type { OttoConfig } from '@ottocode/sdk';
-import { getAuth, createKimiModel } from '@ottocode/sdk';
+import { getProviderDefinition } from '@ottocode/sdk';
+import { createProviderModel } from '@ottocode/sdk/providers';
+import { getRunProviderAuth } from './credentials.ts';
 import { providerFetch } from './fetch.ts';
 
 export async function getKimiInstance(
@@ -7,14 +9,15 @@ export async function getKimiInstance(
 	model: string,
 	sessionId?: string,
 ) {
-	const auth = await getAuth('kimi', cfg.projectRoot);
+	const auth = await getRunProviderAuth('kimi', cfg.projectRoot);
 	const apiKey = auth?.type === 'api' ? auth.key : undefined;
 	const oauth = auth?.type === 'oauth' ? auth : undefined;
-	return createKimiModel(model, {
+	return createProviderModel('kimi', model, {
 		apiKey,
 		oauth,
 		projectRoot: cfg.projectRoot,
-		fetch: providerFetch,
-		promptCacheKey: sessionId,
+		baseURL: getProviderDefinition(cfg, 'kimi')?.baseURL,
+		customFetch: providerFetch,
+		sessionId,
 	});
 }

@@ -7,6 +7,7 @@ import {
 	getProjectId,
 	disposeNativeExtensionHosts,
 	loadConfig,
+	logger,
 	shutdownMCP,
 	setTerminalManager,
 	TerminalManager,
@@ -16,9 +17,14 @@ import {
 import { stat } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { shutdownPartContentWriter } from '../persistence/part-content-writer.ts';
+import { toErrorLogPayload } from '../errors/handling.ts';
 import { abortAllActiveShellJobs } from '../tools/active-shells.ts';
 import { getServerInfo } from '../../state.ts';
-import { recoverInterruptedRuns } from './recovery.ts';
+import {
+	recoverInterruptedRuns,
+	recoverJournaledToolResults,
+} from './recovery.ts';
+import { registerRunOwner } from '../persistence/tool-finalization-owners.ts';
 import { validateProjectDirectory } from './filesystem.ts';
 import { hasActiveProjectQueue } from '../session/queue/state.ts';
 import {
@@ -73,19 +79,55 @@ export class ProjectManager {
 	private readonly cfgCacheById = new Map<string, ConfigCacheState>();
 	private readonly retainCountsById = new Map<string, number>();
 	private evictionTimer: ReturnType<typeof setInterval> | null = null;
+	private readonly openingByRoot = new Map<string, Promise<ProjectRuntime>>();
+	private readonly closingByRoot = new Map<string, Promise<void>>();
 
 	async openProject(input: { path: string }): Promise<ProjectRuntime> {
 		const root = await validateProjectDirectory(input.path);
+		const closing = this.closingByRoot.get(root);
+		if (closing) await closing;
+		const opening = this.openingByRoot.get(root);
+		if (opening) return opening;
 		const existingId = this.idsByRoot.get(root);
 		if (existingId) {
 			return this.getProject({ id: existingId });
 		}
+		const pending = this.initializeProject(root);
+		this.openingByRoot.set(root, pending);
+		try {
+			return await pending;
+		} finally {
+			this.openingByRoot.delete(root);
+		}
+	}
 
+	private async initializeProject(root: string): Promise<ProjectRuntime> {
 		const cfg = await loadConfig(root);
 		const db = await getDb(cfg.projectRoot);
 		const serverInfo = getServerInfo();
+		// Publish this process as a live run owner before any recovery or
+		// run, so other processes on the same DB never mark our work. Without
+		// a lease our runs would be unprotected, so the project must not open.
+		// Nothing project-scoped is allocated yet (the DB handle is the shared
+		// per-path cache), and openProject clears the in-flight entry, so a
+		// later open retries registration from scratch.
+		try {
+			await registerRunOwner(db);
+		} catch (error) {
+			const reason = error instanceof Error ? error.message : String(error);
+			logger.error('[projects] refusing to open project: run owner lease', {
+				root: cfg.projectRoot,
+				error: reason,
+			});
+			throw new Error(
+				`Cannot open project ${cfg.projectRoot}: failed to register run owner lease (${reason})`,
+				{ cause: error },
+			);
+		}
 		if (serverInfo.daemonId) {
 			recoverInterruptedRuns(db, serverInfo.startedAt);
+		} else {
+			recoverJournaledToolResults(db);
 		}
 		await touchProject(cfg.projectRoot, cfg.paths.dbPath);
 		const terminalManager = new TerminalManager();
@@ -113,11 +155,12 @@ export class ProjectManager {
 			},
 		};
 
+		const fingerprint = await configFingerprint(runtime.root);
 		setTerminalManager(terminalManager, cfg.projectRoot);
 		this.runtimesById.set(runtime.id, runtime);
 		this.idsByRoot.set(runtime.root, runtime.id);
 		this.cfgCacheById.set(runtime.id, {
-			fingerprint: await configFingerprint(runtime.root),
+			fingerprint,
 			checkedAt: Date.now(),
 		});
 		this.ensureEvictionTimer();
@@ -131,6 +174,11 @@ export class ProjectManager {
 		if (input.id) {
 			const runtime = this.runtimesById.get(input.id);
 			if (runtime) {
+				const closing = this.closingByRoot.get(runtime.root);
+				if (closing) {
+					await closing;
+					return this.openProject({ path: runtime.root });
+				}
 				this.touchProject(input.id);
 				await this.maybeRefreshConfig(runtime);
 				return runtime;
@@ -189,8 +237,22 @@ export class ProjectManager {
 	}
 
 	async closeProject(id: string): Promise<void> {
+		await Promise.allSettled(this.openingByRoot.values());
 		const runtime = this.runtimesById.get(id);
 		if (!runtime) return;
+		const closing = this.closingByRoot.get(runtime.root);
+		if (closing) return closing;
+		const pending = this.disposeProject(runtime);
+		this.closingByRoot.set(runtime.root, pending);
+		try {
+			await pending;
+		} finally {
+			this.closingByRoot.delete(runtime.root);
+		}
+	}
+
+	private async disposeProject(runtime: ProjectRuntime): Promise<void> {
+		const id = runtime.id;
 		await runtime.stopIdleResources();
 		this.runtimesById.delete(id);
 		this.idsByRoot.delete(runtime.root);
@@ -203,6 +265,7 @@ export class ProjectManager {
 	}
 
 	async closeAllProjects(): Promise<void> {
+		await Promise.allSettled(this.openingByRoot.values());
 		if (this.evictionTimer !== null) {
 			clearInterval(this.evictionTimer);
 			this.evictionTimer = null;
@@ -319,7 +382,11 @@ export async function shutdownProjectManager(): Promise<void> {
 	abortAllActiveShellJobs();
 	try {
 		await shutdownPartContentWriter();
-	} catch {}
+	} catch (error) {
+		logger.error('Failed to persist part content during project shutdown', {
+			error: toErrorLogPayload(error),
+		});
+	}
 	await defaultProjectManager.closeAllProjects();
 }
 

@@ -147,7 +147,8 @@ function isRefreshTokenRejected(
 	description: string,
 	json: unknown,
 ): boolean {
-	if (response.status === 401 || response.status === 403) {
+	if (response.status === 429 || response.status >= 500) return false;
+	if (response.status === 401) {
 		return true;
 	}
 

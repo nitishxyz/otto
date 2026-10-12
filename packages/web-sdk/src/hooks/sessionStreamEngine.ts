@@ -19,6 +19,7 @@ import {
 } from './useMessages';
 import { getProjectKey } from '../lib/api-client/utils';
 import { extractStreamingMultiEditPreviewEdits } from './tool-preview-helpers';
+import { getReadImageSource } from '../lib/read-image';
 
 const TOOL_PREVIEW_THROTTLE_MS = 500;
 const TOOL_PREVIEW_THROTTLE_MIN_CHARS = 8_000;
@@ -1672,6 +1673,8 @@ export function startSessionStreamEngine({
 					if (payloadArgs !== undefined) nextContentJson.args = payloadArgs;
 					if (payloadResult !== undefined)
 						nextContentJson.result = payloadResult;
+					if (payload?.resultTruncated === true)
+						nextContentJson.resultTruncated = true;
 					if (payloadArtifact !== undefined)
 						nextContentJson.artifact = payloadArtifact;
 					const durationMs =
@@ -1779,6 +1782,19 @@ export function startSessionStreamEngine({
 		) {
 			flushPendingDeltas();
 		}
+
+		const needsPersistedPayload =
+			event.type === 'stream.payload.truncated' ||
+			payload?.streamPayloadTruncated === true ||
+			(event.type === 'tool.result' &&
+				(payload?.resultTruncated === true ||
+					payload?.artifactTruncated === true ||
+					payload?.argsTruncated === true ||
+					(getToolEventName(payload) === 'read_image' &&
+						Boolean(
+							(payload?.result as Record<string, unknown> | undefined)?.data,
+						) &&
+						!getReadImageSource(payload?.result))));
 
 		switch (event.type) {
 			case 'message.created': {
@@ -2086,6 +2102,14 @@ export function startSessionStreamEngine({
 			}
 			default:
 				break;
+		}
+
+		if (needsPersistedPayload) {
+			void queryClient.invalidateQueries({
+				queryKey: messagesQueryKey,
+				exact: true,
+				refetchType: 'all',
+			});
 		}
 
 		if (event.type === 'finish-step') {

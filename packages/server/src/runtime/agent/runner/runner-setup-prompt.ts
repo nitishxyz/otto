@@ -18,6 +18,7 @@ import { adaptRunnerCall, detectOAuth } from '../../provider/oauth-adapter.ts';
 import { toErrorMessage } from '../../errors/handling.ts';
 import type { RunOpts } from '../../session/queue.ts';
 import { nowMs } from './runner-setup-utils.ts';
+import { getRunProviderAuth } from '../../provider/credentials.ts';
 
 export type RunnerPromptSetup = {
 	system: string;
@@ -44,8 +45,7 @@ export async function buildRunnerPrompt(args: {
 }): Promise<RunnerPromptSetup> {
 	const { opts, cfg, references, agentPrompt, contextSummary } = args;
 	const composeSystemPromptStartedAt = nowMs();
-	const { getAuth } = await import('@ottocode/sdk');
-	const auth = await getAuth(opts.provider, cfg.projectRoot);
+	const auth = await getRunProviderAuth(opts.provider, cfg.projectRoot);
 	const oauth = detectOAuth(opts.provider, auth);
 	const composed = await composeSystemPrompt({
 		provider: opts.provider,

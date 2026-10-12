@@ -1,4 +1,5 @@
-import { getAuth, createCopilotModel, readEnvKey } from '@ottocode/sdk';
+import { getAuth, readEnvKey } from '@ottocode/sdk';
+import { createProviderModel } from '@ottocode/sdk/providers';
 import type { OttoConfig, OAuth } from '@ottocode/sdk';
 import { providerFetch } from './fetch.ts';
 
@@ -49,6 +50,7 @@ async function getCopilotTokenCandidates(
 
 async function getCopilotAvailableModels(
 	token: string,
+	signal?: AbortSignal,
 ): Promise<Set<string> | null> {
 	const cached = copilotModelsCache.get(token);
 	if (cached && cached.expiresAt > Date.now()) {
@@ -62,6 +64,7 @@ async function getCopilotAvailableModels(
 				'Openai-Intent': 'conversation-edits',
 				'User-Agent': 'ottocode',
 			},
+			signal,
 		});
 
 		if (!response.ok) return null;
@@ -81,12 +84,17 @@ async function getCopilotAvailableModels(
 		});
 
 		return models;
-	} catch {
+	} catch (error) {
+		if (signal?.aborted) throw error;
 		return null;
 	}
 }
 
-export async function resolveCopilotModel(model: string, cfg: OttoConfig) {
+export async function resolveCopilotModel(
+	model: string,
+	cfg: OttoConfig,
+	signal?: AbortSignal,
+) {
 	const candidates = await getCopilotTokenCandidates(cfg.projectRoot);
 	if (!candidates.length) {
 		throw new Error(
@@ -98,7 +106,10 @@ export async function resolveCopilotModel(model: string, cfg: OttoConfig) {
 	const unionAvailableModels = new Set<string>();
 
 	for (const candidate of candidates) {
-		const availableModels = await getCopilotAvailableModels(candidate.token);
+		const availableModels = await getCopilotAvailableModels(
+			candidate.token,
+			signal,
+		);
 		if (!availableModels || availableModels.size === 0) continue;
 
 		for (const availableModel of availableModels) {
@@ -111,9 +122,9 @@ export async function resolveCopilotModel(model: string, cfg: OttoConfig) {
 	}
 
 	if (selected) {
-		return createCopilotModel(model, {
+		return createProviderModel('copilot', model, {
 			oauth: selected.oauth,
-			fetch: providerFetch,
+			customFetch: providerFetch,
 		});
 	}
 
@@ -123,8 +134,8 @@ export async function resolveCopilotModel(model: string, cfg: OttoConfig) {
 		);
 	}
 
-	return createCopilotModel(model, {
+	return createProviderModel('copilot', model, {
 		oauth: candidates[0].oauth,
-		fetch: providerFetch,
+		customFetch: providerFetch,
 	});
 }

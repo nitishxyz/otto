@@ -43,7 +43,12 @@ export function registerRemoveQueuedMessageRoute(app: Hono) {
 			const project = await resolveRequestProject(c);
 			const { db } = project;
 			await sessionRepository(db, project.projectRoot).require(sessionId);
-			const result = await removeSessionQueueMessage(db, sessionId, messageId);
+			const result = await removeSessionQueueMessage(
+				db,
+				sessionId,
+				messageId,
+				project.projectRoot,
+			);
 			return result.status
 				? c.json(result.body, result.status)
 				: c.json(result.body);

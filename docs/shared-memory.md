@@ -42,6 +42,12 @@ Embeddings default to the local quantized `Xenova/all-MiniLM-L6-v2` model (384 d
 
 Configure TypeSafe in Otto's Judge settings (stored auth), or set `TYPESAFE_API_KEY` in the process environment. The project-local ignored `.otto/.env.local` is only a credentials staging file; explicitly load it into the process environment to use it (e.g. `bun --env-file=.otto/.env.local ...`). Never commit or print keys. TypeSafe receives the search query and only in-scope candidate text; avoid storing private data you do not want sent to the service.
 
+## Recall isolation and supersession
+
+Recall resolves each candidate to its latest accessible supersession head before checking excluded/already-loaded IDs and deduplicating results. A matching historical version therefore cannot reinject a current head already loaded in the baseline. Automatic embedding backfill selects at most 20 authorized candidates from the current project/session and permitted global scope, respects the work-audience filter for subagents, and excludes superseded/already-loaded records. It does not run an unscoped administrative reindex during recall.
+
+Explicit `otto memory reindex` is a separate user-level maintenance operation over missing embeddings in the shared store; the scoped automatic-backfill guarantee does not turn that command into a project-only operation. These behaviors live in `packages/sdk/src/memory/index.ts`; reliability coverage is included in `tests/harness-ctx-reliability.test.ts`. See the [Harness reliability roadmap](./plans/harness-reliability-roadmap.md) for verification limits.
+
 ## Orchestrated sessions
 
 Memory turns use explicit origin metadata: direct human messages are `human`; delegated tasks and follow-ups are `parent-agent`; reports and compaction notifications returned to parents are `agent-results`; maintenance messages are `system`. New messages carry this origin both in their text part metadata and in the queued run. For older queued messages without metadata, session type and known delegation wrappers provide a conservative fallback. Only human turns trigger normal capture and recall. Parent-agent tasks recall from the task text (not the delegation wrapper), exclude `audience: 'orchestration'`, and do not capture by default. Results and system messages do neither. Global memory settings add `recallInSubagents: true` and `captureInSubagents: false` defaults. These are independently configurable via `PUT /v1/config/memory`.

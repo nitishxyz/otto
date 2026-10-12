@@ -69,6 +69,7 @@ export function getOpenRouterInstance(
 	);
 	return createOpenRouter({
 		apiKey,
+		baseURL: config?.baseURL,
 		fetch: customFetch,
 	});
 }

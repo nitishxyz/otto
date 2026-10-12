@@ -8,6 +8,11 @@ import { createParser } from 'eventsource-parser';
 import {
 	clientEventSchema,
 	serverEventSchema,
+	serverEventTypeSchema,
+	replayMissedSchema,
+	truncatedPayloadSchema,
+	type ReplayMissedPayload,
+	type TruncatedStreamPayload,
 	type ClientEvent,
 	type NotificationAction,
 	type NotificationEvent,
@@ -170,6 +175,82 @@ export function buildProjectEventsStreamUrl(options: {
 	return url.toString();
 }
 
+export interface SSEDecoder {
+	feed(chunk: Uint8Array): void;
+	flush(): void;
+}
+
+/** Frames SSE bytes across UTF-8, line-ending, and network chunk boundaries. */
+export function createSSEDecoder(
+	onEvent: (event: SSEEvent) => void,
+): SSEDecoder {
+	const decoder = new TextDecoder();
+	const parser = createParser((event) => {
+		if (event.type === 'event') {
+			onEvent({ id: event.id, event: event.event, data: event.data });
+		}
+	});
+	let trailingCR = false;
+	const feedText = (text: string) => {
+		if (!text) return;
+		// eventsource-parser v2 does not retain its CRLF state between feed calls.
+		const normalized =
+			trailingCR && text.startsWith('\n') ? text.slice(1) : text;
+		trailingCR = normalized.endsWith('\r');
+		parser.feed(normalized.replace(/\r\n?/g, '\n'));
+	};
+	return {
+		feed: (chunk) => feedText(decoder.decode(chunk, { stream: true })),
+		flush: () => feedText(decoder.decode()),
+	};
+}
+
+/** Consumes an already-open response; transport and reconnect policy stay with callers. */
+export async function consumeSSEResponse(
+	response: Response,
+	options: {
+		onEvent: (event: SSEEvent) => void;
+		onChunk?: () => void;
+		signal?: AbortSignal;
+	},
+): Promise<void> {
+	if (!response.ok) {
+		await response.body?.cancel();
+		throw new Error(
+			`Failed to connect to stream: ${response.status} ${response.statusText}`.trim(),
+		);
+	}
+	if (!response.body) throw new Error('SSE response has no body');
+	const decoder = createSSEDecoder(options.onEvent);
+	const reader = response.body.getReader();
+	const onAbort = () => {
+		void reader.cancel().catch(() => undefined);
+	};
+	options.signal?.addEventListener('abort', onAbort, { once: true });
+	if (options.signal?.aborted) onAbort();
+	let completed = false;
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) {
+				completed = true;
+				break;
+			}
+			options.onChunk?.();
+			decoder.feed(value);
+		}
+		if (!options.signal?.aborted) decoder.flush();
+	} finally {
+		options.signal?.removeEventListener('abort', onAbort);
+		if (!completed) {
+			try {
+				await reader.cancel();
+			} catch {}
+		}
+		reader.releaseLock();
+	}
+}
+
 export interface ConsumeSSEOptions extends SSERequestOptions {
 	url: string;
 	fetch?: typeof fetch;
@@ -189,42 +270,7 @@ export async function consumeSSE(options: ConsumeSSEOptions): Promise<void> {
 		},
 		signal: options.signal,
 	});
-	if (!response.ok) {
-		throw new Error(
-			`Failed to connect to stream: ${response.status} ${response.statusText}`.trim(),
-		);
-	}
-	if (!response.body) throw new Error('SSE response has no body');
-
-	const parser = createParser((event) => {
-		if (event.type !== 'event') return;
-		options.onEvent({
-			id: event.id,
-			event: event.event,
-			data: event.data,
-		});
-	});
-	const reader = response.body.getReader();
-	const decoder = new TextDecoder();
-	let completed = false;
-	try {
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) {
-				completed = true;
-				break;
-			}
-			parser.feed(decoder.decode(value, { stream: true }));
-		}
-		parser.feed(decoder.decode());
-	} finally {
-		if (!completed) {
-			try {
-				await reader.cancel();
-			} catch {}
-		}
-		reader.releaseLock();
-	}
+	await consumeSSEResponse(response, options);
 }
 
 async function createStreamToUrl(
@@ -328,9 +374,26 @@ export type {
 };
 
 /** Parses the JSON data field from a server session event. */
-export function parseServerEvent(raw: string): ServerEvent | null {
+export function parseServerEvent(
+	raw: string | SSEEvent,
+	sessionId?: string,
+): ServerEvent | null {
 	try {
-		const result = serverEventSchema.safeParse(JSON.parse(raw));
+		const value: unknown = JSON.parse(typeof raw === 'string' ? raw : raw.data);
+		const record =
+			value && typeof value === 'object'
+				? (value as Record<string, unknown>)
+				: {};
+		if (truncatedPayloadSchema.safeParse(value).success) return null;
+		const result = serverEventSchema.safeParse(
+			typeof raw === 'string'
+				? value
+				: {
+						...(sessionId ? { sessionId } : {}),
+						...('payload' in record ? record : { payload: value }),
+						type: raw.event ?? record.type,
+					},
+		);
 		return result.success ? result.data : null;
 	} catch {
 		return null;
@@ -338,10 +401,76 @@ export function parseServerEvent(raw: string): ServerEvent | null {
 }
 
 /** Parses the JSON data field from a global client event. */
-export function parseClientEvent(raw: string): ClientEvent | null {
+export function parseClientEvent(raw: string | SSEEvent): ClientEvent | null {
 	try {
-		const result = clientEventSchema.safeParse(JSON.parse(raw));
+		const value: unknown = JSON.parse(typeof raw === 'string' ? raw : raw.data);
+		const record =
+			value && typeof value === 'object'
+				? (value as Record<string, unknown>)
+				: {};
+		const result = clientEventSchema.safeParse(
+			typeof raw === 'string'
+				? value
+				: {
+						type: raw.event ?? record.type,
+						payload: 'payload' in record ? record.payload : value,
+					},
+		);
 		return result.success ? result.data : null;
+	} catch {
+		return null;
+	}
+}
+export type DecodedSSEEvent =
+	| ServerEvent
+	| ClientEvent
+	| {
+			type: 'stream.replay.missed';
+			payload: ReplayMissedPayload;
+	  }
+	| {
+			type: 'stream.payload.truncated';
+			eventType: string;
+			sessionId?: string;
+			payload: TruncatedStreamPayload;
+	  };
+
+/** Decodes payload-only session/client frames and both legacy and typed project envelopes. */
+export function decodeSSEEvent(
+	event: SSEEvent,
+	sessionId?: string,
+): DecodedSSEEvent | null {
+	try {
+		const value: unknown = JSON.parse(event.data);
+		const record =
+			value && typeof value === 'object'
+				? (value as Record<string, unknown>)
+				: {};
+		if (event.event === 'stream.replay.missed') {
+			const parsed = replayMissedSchema.safeParse(record.payload ?? value);
+			return parsed.success
+				? { type: 'stream.replay.missed', payload: parsed.data }
+				: null;
+		}
+		const truncated = truncatedPayloadSchema.safeParse(value);
+		if (truncated.success) {
+			return {
+				type: 'stream.payload.truncated',
+				eventType: event.event ?? 'message',
+				sessionId:
+					typeof record.sessionId === 'string' ? record.sessionId : sessionId,
+				payload: truncated.data,
+			};
+		}
+		if (sessionId || typeof record.sessionId === 'string')
+			return parseServerEvent(event, sessionId);
+		// Heartbeat is shared by both contracts; without a session it is a client event.
+		if (
+			serverEventTypeSchema.safeParse(event.event).success &&
+			event.event !== 'heartbeat'
+		)
+			return null;
+		return parseClientEvent(event);
 	} catch {
 		return null;
 	}

@@ -1,11 +1,9 @@
 import { getSecureAuthPath } from '../../config/src/paths.ts';
 import type { ProviderId, AuthInfo, AuthFile } from '../../types/src/index.ts';
 import { isDeepStrictEqual } from 'node:util';
+import { readFile } from 'node:fs/promises';
 import { acquireFileLock } from './file-lock.ts';
-import {
-	atomicWriteJsonObject,
-	readOptionalJsonObject,
-} from '../../runtime/json-object-file.ts';
+import { atomicWriteJsonObject } from '../../runtime/json-object-file.ts';
 
 export type {
 	ProviderId,
@@ -18,6 +16,30 @@ function globalAuthPath(): string {
 	return getSecureAuthPath();
 }
 
+async function readAuthFile(path: string): Promise<AuthFile> {
+	let text: string;
+	try {
+		text = await readFile(path, 'utf8');
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {};
+		throw error;
+	}
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch {
+		throw new Error(
+			'Auth file contains invalid JSON; refusing to overwrite credentials.',
+		);
+	}
+	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+		throw new Error(
+			'Auth file must contain an object; refusing to overwrite credentials.',
+		);
+	}
+	return parsed as AuthFile;
+}
+
 let authMutation = Promise.resolve();
 
 function mutateAuthFile<T>(mutator: (auth: AuthFile) => T): Promise<T> {
@@ -25,7 +47,7 @@ function mutateAuthFile<T>(mutator: (auth: AuthFile) => T): Promise<T> {
 		const path = globalAuthPath();
 		const release = await acquireFileLock(`${path}.lock`);
 		try {
-			const existing = ((await readOptionalJsonObject(path)) ?? {}) as AuthFile;
+			const existing = await readAuthFile(path);
 			const result = mutator(existing);
 			await atomicWriteJsonObject(path, existing, { mode: 0o600 });
 			return result;
@@ -41,8 +63,7 @@ function mutateAuthFile<T>(mutator: (auth: AuthFile) => T): Promise<T> {
 }
 
 export async function getAllAuth(_projectRoot?: string): Promise<AuthFile> {
-	const globalData = ((await readOptionalJsonObject(globalAuthPath())) ??
-		{}) as AuthFile;
+	const globalData = await readAuthFile(globalAuthPath());
 	return { ...globalData };
 }
 

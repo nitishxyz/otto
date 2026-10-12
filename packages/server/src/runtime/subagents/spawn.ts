@@ -1,10 +1,8 @@
-import { and, eq } from 'drizzle-orm';
 import {
 	hasConfiguredProvider,
 	isDelegatableAgent,
 	logger,
 } from '@ottocode/sdk';
-import { subagents } from '@ottocode/database/schema';
 import { publish } from '../../events/bus.ts';
 import { discoverAllAgents, resolveAgentConfig } from '../agent/registry.ts';
 import { createSession } from '../session/manager.ts';
@@ -14,10 +12,13 @@ import { dispatchSubagentMessage } from './dispatch.ts';
 import { buildSubagentPrompt } from './prompt.ts';
 import { resolveReusableChildSession } from './reuse.ts';
 import {
-	MAX_CONCURRENT_PER_PARENT,
-	type SpawnSubagentInput,
-	type SpawnSubagentResult,
-} from './types.ts';
+	attemptOf,
+	checkSpawnCapacity,
+	reserveSpawnAttempt,
+	subagentAttemptTurnClaim,
+	terminateSubagentAttempt,
+} from './transitions.ts';
+import type { SpawnSubagentInput, SpawnSubagentResult } from './types.ts';
 
 /**
  * Spawns an async sub-agent run in a new child session, or resumes an
@@ -84,36 +85,43 @@ export async function spawnSubagent(
 	}
 
 	const subagentId = crypto.randomUUID();
-	const now = Date.now();
-	await db.insert(subagents).values({
+	const reserved = reserveSpawnAttempt(db, {
 		id: subagentId,
 		parentSessionId,
 		childSessionId: childSession.id,
 		agent: targetAgent,
 		task,
-		status: 'running',
-		summary: null,
-		reported: false,
-		createdAt: now,
-		updatedAt: now,
 	});
+	if (!reserved.ok) return { ok: false, error: reserved.error };
 
-	await dispatchSubagentMessage({
-		cfg,
-		db,
-		session: childSession,
-		agent: targetAgent,
-		content: buildSubagentPrompt({
-			parentSessionId,
-			parentAgent,
-			task,
-			context,
-			isReuse,
-		}),
-		context: files?.length ? { files } : undefined,
-		messageOrigin: 'parent-agent',
-		memoryTask: task,
-	});
+	try {
+		await dispatchSubagentMessage({
+			cfg,
+			db,
+			session: childSession,
+			agent: targetAgent,
+			content: buildSubagentPrompt({
+				parentSessionId,
+				parentAgent,
+				task,
+				context,
+				isReuse,
+			}),
+			context: files?.length ? { files } : undefined,
+			messageOrigin: 'parent-agent',
+			memoryTask: task,
+			acceptClaim: subagentAttemptTurnClaim(attemptOf(reserved.record)),
+		});
+	} catch (error) {
+		const reason = error instanceof Error ? error.message : String(error);
+		terminateSubagentAttempt(db, attemptOf(reserved.record), {
+			status: 'failed',
+			summary: `Failed to dispatch sub-agent task: ${reason}`,
+			reported: false,
+		});
+		logger.warn('[subagent] dispatch failed', { subagentId, error: reason });
+		return { ok: false, error: `Failed to start sub-agent: ${reason}` };
+	}
 
 	publish({
 		type: 'session.updated',
@@ -171,21 +179,5 @@ async function validateSpawnTarget(args: {
 		};
 	}
 
-	const running = await args.db
-		.select({ id: subagents.id })
-		.from(subagents)
-		.where(
-			and(
-				eq(subagents.parentSessionId, args.parentSessionId),
-				eq(subagents.status, 'running'),
-			),
-		);
-	if (running.length >= MAX_CONCURRENT_PER_PARENT) {
-		return {
-			ok: false,
-			error: `Too many running sub-agents (max ${MAX_CONCURRENT_PER_PARENT}). Wait for one to finish or use subagent action=list.`,
-		};
-	}
-
-	return { ok: true };
+	return checkSpawnCapacity(args.db, args.parentSessionId);
 }

@@ -1,5 +1,7 @@
 # Runner, Provider, and Tool Adapter Refactor Plan
 
+> **Status (October 2026):** extraction phases are done; hotspot sizes below are historical. Lifecycle and reliability follow-up is tracked in [harness-reliability-roadmap.md](harness-reliability-roadmap.md).
+
 ## Problem
 
 The core agent runtime works, but several crucial files have accumulated too many responsibilities, compatibility branches, fallback paths, and duplicated helper logic. This makes behavior hard to reason about and makes future provider/tool changes risky.

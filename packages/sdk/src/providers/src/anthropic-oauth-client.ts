@@ -1,6 +1,6 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { OAuth } from '../../types/src/index.ts';
-import { getAuth, setAuth } from '../../auth/src/index.ts';
+import { getFreshAnthropicOAuth } from '../../auth/src/anthropic-refresh.ts';
 import { refreshToken } from '../../auth/src/oauth.ts';
 import { warn as loggerWarn } from '../../core/src/utils/logger.ts';
 import { addAnthropicCacheControl } from './anthropic-caching.ts';
@@ -22,8 +22,6 @@ type FetchLike = (
 	init?: Parameters<typeof fetch>[1],
 ) => Promise<Response>;
 
-const refreshPromises = new Map<string, Promise<OAuth>>();
-
 export type AnthropicOAuthConfig = {
 	oauth: {
 		access: string;
@@ -31,58 +29,24 @@ export type AnthropicOAuthConfig = {
 		expires: number;
 	};
 	projectRoot?: string;
+	/** Managed clients require stored auth; standalone clients use only explicit tokens. */
+	authMode?: 'managed' | 'standalone';
 	toolNameTransformer?: (name: string) => string;
+	fetch?: typeof fetch;
 };
 
-function refreshKey(projectRoot?: string) {
-	return projectRoot ?? 'global';
-}
-
-function toOAuth(oauth: AnthropicOAuthConfig['oauth']): OAuth {
-	return {
-		type: 'oauth',
-		access: oauth.access,
-		refresh: oauth.refresh,
-		expires: oauth.expires,
-	};
-}
-
-function isAccessValidBeyondBuffer(oauth: OAuth) {
-	return Boolean(
-		oauth.access && oauth.expires > Date.now() + TOKEN_EXPIRY_BUFFER_MS,
-	);
-}
-
-async function refreshAndPersist(
-	oauth: OAuth,
+async function ensureValidToken(
 	projectRoot?: string,
+	staleAccess?: string,
 ): Promise<OAuth> {
-	const key = refreshKey(projectRoot);
-	const inFlight = refreshPromises.get(key);
-	if (inFlight) {
-		return inFlight;
-	}
-
-	const promise = (async () => {
-		const diskAuth = await getAuth('anthropic', projectRoot);
-		if (diskAuth?.type === 'oauth' && isAccessValidBeyondBuffer(diskAuth)) {
-			return diskAuth;
-		}
-
-		const refreshFrom =
-			diskAuth?.type === 'oauth' ? diskAuth.refresh : oauth.refresh;
-		return retry(
-			async () => {
-				const tokens = await refreshToken(refreshFrom);
-				const updated: OAuth = {
-					type: 'oauth',
-					access: tokens.access,
-					refresh: tokens.refresh,
-					expires: tokens.expires,
-				};
-				await setAuth('anthropic', updated, projectRoot, 'global');
-				return updated;
-			},
+	try {
+		const oauth = await retry(
+			() =>
+				getFreshAnthropicOAuth({
+					projectRoot,
+					staleAccess,
+					refreshWindowMs: TOKEN_EXPIRY_BUFFER_MS,
+				}),
 			{
 				maxRetries: TOKEN_REFRESH_MAX_RETRIES,
 				delayMs: ({ attempt }) => TOKEN_REFRESH_RETRY_DELAY_MS * (attempt + 1),
@@ -91,27 +55,12 @@ async function refreshAndPersist(
 						'refresh token rejected',
 					),
 			},
-		).catch((error) => {
-			throw error instanceof Error ? error : new Error(String(error));
-		});
-	})().finally(() => {
-		refreshPromises.delete(key);
-	});
-
-	refreshPromises.set(key, promise);
-	return promise;
-}
-
-async function ensureValidToken(
-	currentOAuth: OAuth,
-	projectRoot?: string,
-): Promise<OAuth> {
-	if (isAccessValidBeyondBuffer(currentOAuth)) {
-		return currentOAuth;
-	}
-
-	try {
-		return await refreshAndPersist(currentOAuth, projectRoot);
+		);
+		if (!oauth)
+			throw new Error(
+				'Anthropic OAuth is no longer configured. Run `otto auth login anthropic`.',
+			);
+		return oauth;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		loggerWarn(
@@ -263,10 +212,39 @@ export function createAnthropicOAuthFetch(
 	config: AnthropicOAuthConfig,
 ): FetchLike {
 	const { toolNameTransformer, projectRoot } = config;
-	let currentOAuth = toOAuth(config.oauth);
+	const transport = config.fetch ?? fetch;
+	let explicitOAuth: OAuth = { ...config.oauth, type: 'oauth' };
+	let refreshing: Promise<OAuth> | undefined;
+	const getToken = async (staleAccess?: string): Promise<OAuth> => {
+		if (config.authMode === 'managed')
+			return ensureValidToken(projectRoot, staleAccess);
+		if (
+			explicitOAuth.access &&
+			explicitOAuth.expires > Date.now() + TOKEN_EXPIRY_BUFFER_MS &&
+			explicitOAuth.access !== staleAccess
+		)
+			return explicitOAuth;
+		if (refreshing) return refreshing;
+		refreshing = retry(() => refreshToken(explicitOAuth.refresh), {
+			maxRetries: TOKEN_REFRESH_MAX_RETRIES,
+			delayMs: ({ attempt }) => TOKEN_REFRESH_RETRY_DELAY_MS * (attempt + 1),
+			shouldRetry: (error) =>
+				!(error instanceof Error ? error.message : String(error)).includes(
+					'refresh token rejected',
+				),
+		})
+			.then((tokens) => {
+				explicitOAuth = { ...tokens, type: 'oauth' };
+				return explicitOAuth;
+			})
+			.finally(() => {
+				refreshing = undefined;
+			});
+		return refreshing;
+	};
 
 	return async (input: string | URL | Request, init?: RequestInit) => {
-		currentOAuth = await ensureValidToken(currentOAuth, projectRoot);
+		let currentOAuth = await getToken();
 
 		const execute = async (accessToken: string) => {
 			const prepared = prepareAnthropicRequest(
@@ -275,29 +253,20 @@ export function createAnthropicOAuthFetch(
 				accessToken,
 				toolNameTransformer,
 			);
-			const response = await fetch(prepared.url, {
+			const response = await transport(prepared.url, {
 				...init,
 				body: prepared.body,
 				headers: prepared.headers,
 			});
 			return retryWithoutBoundThinking(response, prepared.body, (body) =>
-				fetch(prepared.url, { ...init, body, headers: prepared.headers }),
+				transport(prepared.url, { ...init, body, headers: prepared.headers }),
 			);
 		};
 
 		let response = await execute(currentOAuth.access);
 
 		if (response.status === 401) {
-			const diskAuth = await getAuth('anthropic', projectRoot);
-			if (
-				diskAuth?.type === 'oauth' &&
-				diskAuth.access !== currentOAuth.access &&
-				isAccessValidBeyondBuffer(diskAuth)
-			) {
-				currentOAuth = diskAuth;
-			} else {
-				currentOAuth = await refreshAndPersist(currentOAuth, projectRoot);
-			}
+			currentOAuth = await getToken(currentOAuth.access);
 
 			response = await execute(currentOAuth.access);
 		}

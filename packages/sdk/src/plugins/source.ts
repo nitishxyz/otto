@@ -1,6 +1,7 @@
-import { cp, readdir, rm } from 'node:fs/promises';
+import { cp, readdir } from 'node:fs/promises';
 import { z } from 'zod/v3';
 import { ensureDir, fileExists, joinPath } from '../config/src/paths.ts';
+import { atomicWriteText, removeDescendantPath } from './fs-safety.ts';
 import { pluginManifestSchema } from './schema.ts';
 import type {
 	PluginManifest,
@@ -37,11 +38,15 @@ export async function readPluginManifestFromDir(
 	return pluginManifestSchema.parse(parsed);
 }
 
+/**
+ * Copies a plugin payload into a fresh (non-existent or empty) staging
+ * directory. Never deletes anything; callers stage into new directories and
+ * promote atomically.
+ */
 export async function copyPluginDir(
 	sourceDir: string,
 	targetDir: string,
 ): Promise<void> {
-	await rm(targetDir, { recursive: true, force: true });
 	await ensureDir(targetDir.slice(0, targetDir.lastIndexOf('/')));
 	await cp(sourceDir, targetDir, { recursive: true, force: true });
 }
@@ -125,7 +130,6 @@ export async function installRegistryEntryPayload(
 		}
 	}
 
-	await rm(targetDir, { recursive: true, force: true });
 	await ensureDir(targetDir);
 	await downloadGithubPath(entry.source, targetDir, fetchImpl ?? fetch);
 }
@@ -135,7 +139,6 @@ async function writeRegistryEntryPayload(
 	targetDir: string,
 ): Promise<void> {
 	const { official: _official, source: _source, ...manifest } = entry;
-	await rm(targetDir, { recursive: true, force: true });
 	await ensureDir(targetDir);
 	await Bun.write(
 		joinPath(targetDir, 'otto.plugin.json'),
@@ -158,7 +161,10 @@ export async function materializePluginSkillSources(
 			continue;
 		}
 
-		const skillDir = joinPath(pluginDir, 'skills', skill.name);
+		const skillsRoot = joinPath(pluginDir, 'skills');
+		const skillDir = joinPath(skillsRoot, skill.name);
+		await ensureDir(skillsRoot);
+		await removeDescendantPath(skillsRoot, skillDir);
 		await installSkillSourcePayload(skill.source, skillDir, fetchImpl ?? fetch);
 		skills.push({
 			...skill,
@@ -173,7 +179,7 @@ export async function materializePluginSkillSources(
 		...manifest,
 		skills,
 	});
-	await Bun.write(
+	await atomicWriteText(
 		joinPath(pluginDir, 'otto.plugin.json'),
 		`${JSON.stringify(updated, null, 2)}\n`,
 	);
@@ -185,7 +191,6 @@ async function installSkillSourcePayload(
 	targetDir: string,
 	fetchImpl: typeof fetch,
 ): Promise<void> {
-	await rm(targetDir, { recursive: true, force: true });
 	await ensureDir(targetDir);
 
 	if (source.type === 'local') {
@@ -259,7 +264,11 @@ async function downloadGithubPath(
 		) {
 			return;
 		}
-		if (entry.type !== 'file' || !entry.download_url) {
+		if (
+			entry.type !== 'file' ||
+			!entry.download_url ||
+			!isPlainPathSegment(entry.name)
+		) {
 			throw new Error(`Unsupported GitHub payload ${entry.path}`);
 		}
 		const fileResponse = await fetchImpl(entry.download_url);
@@ -273,6 +282,9 @@ async function downloadGithubPath(
 	const entries = z.array(githubEntrySchema).parse(payload);
 
 	for (const entry of entries) {
+		if (!isPlainPathSegment(entry.name)) {
+			throw new Error(`Unsafe plugin payload entry name: ${entry.name}`);
+		}
 		const relativePath = githubRelativePath(entry.path, options.rootPath);
 		if (isExcludedSourcePath(relativePath, options.exclude)) continue;
 
@@ -351,7 +363,7 @@ async function removeExcludedSourcePaths(
 		const path = normalized.endsWith('/**')
 			? normalized.slice(0, -'/**'.length)
 			: normalized;
-		await rm(joinPath(targetDir, path), { recursive: true, force: true });
+		await removeDescendantPath(targetDir, joinPath(targetDir, path));
 	}
 }
 
@@ -428,4 +440,14 @@ function shouldVisitSourceDirectory(
 
 export function normalizeSourcePattern(value: string): string {
 	return value.replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/+$/, '');
+}
+
+function isPlainPathSegment(name: string): boolean {
+	return (
+		name.length > 0 &&
+		name !== '.' &&
+		name !== '..' &&
+		!name.includes('/') &&
+		!name.includes('\\')
+	);
 }

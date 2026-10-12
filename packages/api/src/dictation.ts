@@ -24,6 +24,14 @@ export type DictationSession = CreateDictationSessionResponse;
 export type DictationModelInstallResponse = InstallDictationModelResponse;
 
 export type { DictationFinalEvent, DictationServerEvent };
+export type {
+	AudioFormat,
+	DictationClientMessage,
+	DictationErrorCode,
+	DictationErrorEvent,
+	DictationReadyEvent,
+	DictationRecordingEvent,
+} from '@ottocode/sdk/dictation/protocol';
 
 export interface DictationWebSocketLike {
 	readonly readyState: number;

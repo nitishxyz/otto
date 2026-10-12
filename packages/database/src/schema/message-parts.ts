@@ -1,4 +1,9 @@
-import { index, sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import {
+	sqliteTable,
+	text,
+	integer,
+	uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 import { messages } from './messages.ts';
 
 export const messageParts = sqliteTable(
@@ -25,6 +30,9 @@ export const messageParts = sqliteTable(
 		toolDurationMs: integer('tool_duration_ms'),
 	},
 	(table) => [
-		index('message_parts_message_index_idx').on(table.messageId, table.index),
+		uniqueIndex('message_parts_message_index_unique').on(
+			table.messageId,
+			table.index,
+		),
 	],
 );

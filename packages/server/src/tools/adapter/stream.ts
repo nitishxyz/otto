@@ -1,3 +1,4 @@
+import { createToolError } from '@ottocode/sdk/tools/error';
 import type { ToolAdapterContext } from '../../runtime/tools/context.ts';
 import { publishToolDelta } from './events.ts';
 
@@ -38,6 +39,15 @@ export function getTerminalId(chunk: unknown): string | null {
 	return null;
 }
 
+function isTerminalChunk(chunk: unknown): chunk is { result: unknown } {
+	return Boolean(chunk && typeof chunk === 'object' && 'result' in chunk);
+}
+
+/**
+ * Drains a streaming tool. The first `{ result }` chunk is the single
+ * terminal outcome; deltas are published as they arrive. A stream that
+ * ends without a terminal chunk is a failure, never an implicit success.
+ */
 export async function consumeToolStream(
 	ctx: ToolAdapterContext,
 	args: {
@@ -45,17 +55,27 @@ export async function consumeToolStream(
 		name: string;
 		stepIndex?: number;
 		callId?: string;
+		suppressDeltas?: boolean;
 	},
 ): Promise<unknown> {
-	let lastChunk: unknown = null;
-	let streamedResult: unknown = null;
+	let terminal: { result: unknown } | undefined;
 
 	for await (const chunk of args.stream) {
-		lastChunk = chunk;
-		if (chunk && typeof chunk === 'object' && 'result' in chunk) {
-			streamedResult = (chunk as { result: unknown }).result;
+		if (isTerminalChunk(chunk)) {
+			if (terminal) {
+				return createToolError(
+					'Tool stream emitted multiple results',
+					'execution',
+					{
+						reason: 'multiple_terminal_results',
+					},
+				);
+			} else {
+				terminal = { result: chunk.result };
+			}
 			continue;
 		}
+		if (terminal || args.suppressDeltas) continue;
 
 		const terminalId = getTerminalId(chunk);
 		if (terminalId) {
@@ -81,5 +101,10 @@ export async function consumeToolStream(
 		});
 	}
 
-	return streamedResult ?? lastChunk;
+	if (!terminal) {
+		return createToolError('Tool stream ended without a result', 'execution', {
+			reason: 'missing_terminal_result',
+		});
+	}
+	return terminal.result;
 }

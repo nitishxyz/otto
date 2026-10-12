@@ -2,26 +2,24 @@ import type { getDb } from '@ottocode/database';
 import type { loadConfig } from '@ottocode/sdk';
 import { triggerDeferredTitleGeneration } from '../../message/service.ts';
 import {
-	completeAssistantMessage,
 	updateMessageTokensIncremental,
 	updateSessionTokensIncremental,
 } from '../../session/db-operations.ts';
-import {
-	isSendNowPreemptReason,
-	isSystemAbortReason,
-	type RunOpts,
-} from '../../session/queue.ts';
+import type { RunOpts } from '../../session/queue.ts';
 import {
 	createAbortHandler,
 	createErrorHandler,
-	createFinishHandler,
 	createStepFinishHandler,
 } from '../../stream/handlers.ts';
 import type { ToolAdapterContext } from '../../../tools/adapter.ts';
+import type { RunSessionLoop } from '../turn/types.ts';
 import { flushRunnerTextPart, type RunnerTextState } from './runner-text.ts';
 
-type RunSessionLoop = (sessionId: string) => Promise<void>;
-
+/**
+ * Builds the per-run stream callbacks. `onStepFinish` is passed to the AI SDK;
+ * `persistError` and `persistAbort` are terminal writers invoked only by the
+ * turn executor after it has decided the outcome.
+ */
 export function createRunnerStreamHandlers(args: {
 	opts: RunOpts;
 	db: Awaited<ReturnType<typeof getDb>>;
@@ -33,12 +31,7 @@ export function createRunnerStreamHandlers(args: {
 	incrementStepIndex: () => number;
 	runSessionLoop: RunSessionLoop;
 }) {
-	const state = {
-		abortedByUser: false,
-		sendNowPreemptHandled: false,
-		abortHandled: false,
-		titleGenerationTriggered: false,
-	};
+	let titleGenerationTriggered = false;
 
 	const getCurrentPartId = () => args.textState.currentPartId;
 	const updateCurrentPartId = (id: string | null) => {
@@ -50,14 +43,12 @@ export function createRunnerStreamHandlers(args: {
 	// Text delta persistence is throttled; flush pending content before any
 	// handler that completes, errors, or aborts the current text part.
 	const flushTextPart = async () => {
-		try {
-			await flushRunnerTextPart(args.textState, args.db);
-		} catch {}
+		await flushRunnerTextPart(args.textState, args.db);
 	};
 	const triggerTitleGenerationWhenReady = () => {
-		if (state.titleGenerationTriggered) return;
+		if (titleGenerationTriggered) return;
 
-		state.titleGenerationTriggered = true;
+		titleGenerationTriggered = true;
 		if (!args.isFirstMessage) return;
 
 		void triggerDeferredTitleGeneration({
@@ -94,9 +85,8 @@ export function createRunnerStreamHandlers(args: {
 		args.sharedCtx,
 		args.runSessionLoop,
 	);
-	const onError = async (event: Parameters<typeof baseOnError>[0]) => {
-		await flushTextPart();
-		await baseOnError(event);
+	const persistError = async (error: unknown) => {
+		await baseOnError(error);
 	};
 
 	const baseOnAbort = createAbortHandler(
@@ -105,27 +95,15 @@ export function createRunnerStreamHandlers(args: {
 		args.getStepIndex,
 		args.sharedCtx,
 	);
-	const onAbort = async (event: Parameters<typeof baseOnAbort>[0]) => {
-		const abortReason = (
-			args.opts.abortSignal as (AbortSignal & { reason?: unknown }) | undefined
-		)?.reason;
-		const isSendNowPreempt = isSendNowPreemptReason(abortReason);
-		if (state.abortHandled) return;
-		state.abortHandled = true;
-		state.abortedByUser =
-			!isSendNowPreempt && !isSystemAbortReason(abortReason);
-		state.sendNowPreemptHandled = isSendNowPreempt;
-		await flushTextPart();
+	const persistAbort = async (event: Parameters<typeof baseOnAbort>[0]) => {
 		await baseOnAbort(event);
 	};
 
 	return {
 		onStepFinish,
-		onError,
-		onAbort,
-		onFinish: createFinishHandler(args.opts, args.db, completeAssistantMessage),
+		persistError,
+		persistAbort,
+		flushTextPart,
 		triggerTitleGenerationWhenReady,
-		getAbortedByUser: () => state.abortedByUser,
-		getSendNowPreemptHandled: () => state.sendNowPreemptHandled,
 	};
 }

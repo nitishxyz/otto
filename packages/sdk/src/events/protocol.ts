@@ -1,384 +1,89 @@
 import { z } from 'zod';
 
-export const serverEventTypeSchema = z.enum([
-	'tool.approval.required',
-	'tool.approval.updated',
-	'tool.approval.resolved',
-	'shell.secure_input.required',
-	'shell.secure_input.resolved',
-	'ottorouter.payment.required',
-	'ottorouter.payment.signing',
-	'ottorouter.payment.complete',
-	'ottorouter.payment.error',
-	'ottorouter.topup.required',
-	'ottorouter.topup.method_selected',
-	'ottorouter.topup.cancelled',
-	'ottorouter.fiat.checkout_created',
-	'ottorouter.balance.updated',
-	'session.created',
-	'session.deleted',
-	'session.updated',
-	'message.created',
-	'message.updated',
-	'message.part.delta',
-	'reasoning.delta',
-	'message.completed',
-	'tool.call',
-	'tool.delta',
-	'tool.result',
-	'shell.job.updated',
-	'shell.job.output',
-	'plan.updated',
-	'goal.updated',
-	'finish-step',
-	'usage',
-	'queue.updated',
-	'error',
-	'heartbeat',
+const id = z.string().min(1);
+const stepIndex = z.number().int().optional();
+const boundedEventValueMetadataSchema = z.object({
+	argsTruncated: z.boolean().optional(),
+	argsOriginalBytes: z.number().optional(),
+	resultTruncated: z.boolean().optional(),
+	resultOriginalBytes: z.number().optional(),
+	artifactTruncated: z.boolean().optional(),
+	artifactOriginalBytes: z.number().optional(),
+});
+const approvalRequiredSchema = z.looseObject({
+	callId: id,
+	toolName: id,
+	args: z.unknown(),
+	messageId: id,
+});
+const paymentRequiredSchema = z.looseObject({
+	amountUsd: z.number(),
+	currentBalance: z.number().optional(),
+});
+const idPayload = z.looseObject({ id });
+export const shellJobStatusSchema = z.enum([
+	'running',
+	'completed',
+	'failed',
+	'cancelled',
 ]);
-
-export type ServerEventType = z.infer<typeof serverEventTypeSchema>;
-/** @deprecated Use ServerEventType. */
-export type OttoEventType = ServerEventType;
-
-export interface ToolApprovalRequiredPayload {
-	callId: string;
-	toolName: string;
-	args: unknown;
-	messageId: string;
-}
-
-export interface ToolApprovalUpdatedPayload
-	extends ToolApprovalRequiredPayload {}
-
-export interface ToolApprovalResolvedPayload {
-	callId: string;
-	toolName: string;
-	approved: boolean;
-	reason: 'timeout' | 'user_approved' | 'user_rejected';
-}
-
-export interface SecureInputRequiredPayload {
-	promptId: string;
-	messageId: string;
-	callId?: string;
-	prompt: string;
-	inputKind: 'text' | 'password';
-	allowRemember: boolean;
-}
-
-export interface SecureInputResolvedPayload {
-	promptId: string;
-	messageId: string;
-	callId?: string;
-	cancelled: boolean;
-	reason: 'timeout' | 'user_cancelled' | 'user_submitted';
-}
-
-export interface PaymentRequiredPayload {
-	amountUsd: number;
-	currentBalance?: number;
-}
-
-export interface PaymentCompletePayload {
-	amountUsd: number;
-	newBalance: number;
-	transactionId?: string;
-}
-
-export interface BalanceUpdatedPayload {
-	costUsd: number;
-	balanceRemaining: number;
-	inputTokens?: number;
-	outputTokens?: number;
-}
-
-export interface PaymentErrorPayload {
-	error: string;
-}
-
-export interface TopupRequiredPayload extends PaymentRequiredPayload {
-	messageId?: string;
-	currentBalance: number;
-	minTopupUsd: number;
-	suggestedTopupUsd: number;
-}
-
-export interface FiatCheckoutCreatedPayload {
-	messageId: string;
-	needsTopup: boolean;
-}
-
-export interface SessionPayload {
-	id: string;
-	[key: string]: unknown;
-}
-
-export interface MessageCreatedPayload {
-	id: string;
-	sessionId?: string;
-	role?: 'user' | 'assistant' | 'system';
-	status?: string;
-	agent?: string;
-	provider?: string;
-	model?: string;
-	createdAt?: string | number;
-	completedAt?: string | number;
-	content?: string;
-	attachmentNames?: string[];
-	providerStreamRetry?: boolean;
-	maxOutputContinuation?: boolean;
-	[key: string]: unknown;
-}
-
-export interface MessageUpdatedPayload {
-	id: string;
-	status: string;
-	error?: string;
-	[key: string]: unknown;
-}
-
-export interface MessagePartDeltaPayload {
-	messageId: string;
-	partId: string;
-	stepIndex?: number;
-	delta?: string;
-	type?: string;
-	content?: string;
-}
-
-export interface ReasoningDeltaPayload {
-	messageId: string;
-	partId: string;
-	stepIndex: number;
-	delta: string;
-}
-
-export interface MessageCompletedPayload {
-	id: string;
-	usage?: unknown;
-	costUsd?: number;
-	finishReason?: string;
-	rawFinishReason?: string;
-	autoCompacted?: boolean;
-	providerStreamRetry?: boolean;
-	fiatTopupRequired?: boolean;
-	preemptedBy?: string;
-	status?: string;
-	[key: string]: unknown;
-}
-
-export interface BoundedEventValueMetadata {
-	argsTruncated?: boolean;
-	argsOriginalBytes?: number;
-	resultTruncated?: boolean;
-	resultOriginalBytes?: number;
-	artifactTruncated?: boolean;
-	artifactOriginalBytes?: number;
-}
-
-export interface ToolCallPayload extends BoundedEventValueMetadata {
-	name: string;
-	callId: string;
-	messageId: string;
-	args: unknown;
-	stepIndex?: number;
-	index?: number;
-}
-
-export interface ToolDeltaPayload {
-	name: string;
-	channel: string;
-	delta: unknown;
-	messageId: string;
-	stepIndex?: number;
-	callId?: string;
-	deltaTruncated?: boolean;
-	deltaOriginalBytes?: number;
-}
-
-export interface ToolResultPayload extends BoundedEventValueMetadata {
-	name: string;
-	messageId: string;
-	result: unknown;
-	callId?: string;
-	stepIndex?: number;
-	args?: unknown;
-	artifact?: unknown;
-}
-
-export type ShellJobStatus = 'running' | 'completed' | 'failed' | 'cancelled';
-
-export interface ShellJobSnapshot {
-	id: string;
-	projectRoot?: string;
-	sessionId: string;
-	messageId: string;
-	callId?: string;
-	command: string;
-	cwd: string;
-	status: ShellJobStatus;
-	detached: boolean;
-	output: string;
-	exitCode: number | null;
-	result: unknown;
-	reported: boolean;
-	createdAt: number;
-	updatedAt: number;
-	completedAt: number | null;
-}
-
-export interface PlanItem {
-	step: string;
-	status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-}
-
-export interface PlanUpdatedPayload {
-	items: PlanItem[];
-	note?: string;
-}
-
-export interface GoalUpdatedPayload {
-	goalId: string;
-	changes: string[];
-}
-
-export interface FinishStepPayload {
-	stepIndex?: number;
-	usage?: unknown;
-	finishReason?: string;
-	response?: unknown;
-	reason?: 'no-tool-calls';
-}
-
-export interface UsagePayload {
-	stepIndex: number;
-	[key: string]: unknown;
-}
-
-export interface QueueUpdatedPayload {
-	currentMessageId: string | null;
-	queuedMessages: unknown[];
-	queueLength: number;
-	isRunning: boolean;
-}
-
-export interface ErrorPayload {
-	messageId: string;
-	partId?: string;
-	message?: string;
-	type?: string;
-	error?: string;
-	errorType?: string;
-	details?: unknown;
-	isAborted: boolean;
-	autoCompacted?: boolean;
-	stepsCompleted?: number;
-}
-
-export interface ServerEventPayloadMap {
-	'tool.approval.required': ToolApprovalRequiredPayload;
-	'tool.approval.updated': ToolApprovalUpdatedPayload;
-	'tool.approval.resolved': ToolApprovalResolvedPayload;
-	'shell.secure_input.required': SecureInputRequiredPayload;
-	'shell.secure_input.resolved': SecureInputResolvedPayload;
-	'ottorouter.payment.required': PaymentRequiredPayload;
-	'ottorouter.payment.signing': Record<string, never>;
-	'ottorouter.payment.complete': PaymentCompletePayload;
-	'ottorouter.payment.error': PaymentErrorPayload;
-	'ottorouter.topup.required': TopupRequiredPayload;
-	'ottorouter.topup.method_selected': { method: string };
-	'ottorouter.topup.cancelled': { reason: string };
-	'ottorouter.fiat.checkout_created': FiatCheckoutCreatedPayload;
-	'ottorouter.balance.updated': BalanceUpdatedPayload;
-	'session.created': SessionPayload;
-	'session.deleted': { id: string };
-	'session.updated': SessionPayload;
-	'message.created': MessageCreatedPayload;
-	'message.updated': MessageUpdatedPayload;
-	'message.part.delta': MessagePartDeltaPayload;
-	'reasoning.delta': ReasoningDeltaPayload;
-	'message.completed': MessageCompletedPayload;
-	'tool.call': ToolCallPayload;
-	'tool.delta': ToolDeltaPayload;
-	'tool.result': ToolResultPayload;
-	'shell.job.updated': { job: ShellJobSnapshot };
-	'shell.job.output': { jobId: string; delta: string; updatedAt: number };
-	'plan.updated': PlanUpdatedPayload;
-	'goal.updated': GoalUpdatedPayload;
-	'finish-step': FinishStepPayload;
-	usage: UsagePayload;
-	'queue.updated': QueueUpdatedPayload;
-	error: ErrorPayload;
-	heartbeat: { createdAt: string };
-}
-
-export type ServerEvent<T extends ServerEventType = ServerEventType> =
-	T extends ServerEventType
-		? {
-				type: T;
-				sessionId: string;
-				projectId?: string;
-				projectRoot?: string;
-				payload: ServerEventPayloadMap[T];
-			}
-		: never;
-
-/** @deprecated Use ServerEvent. */
-export type OttoEvent<T extends ServerEventType = ServerEventType> =
-	ServerEvent<T>;
-
-const objectPayload = z.looseObject({});
-const idPayload = z.looseObject({ id: z.string().min(1) });
-const messagePartPayload = z.looseObject({
-	messageId: z.string().min(1),
-	partId: z.string().min(1),
+export const shellJobSnapshotSchema = z.object({
+	id,
+	projectRoot: z.string().optional(),
+	sessionId: id,
+	messageId: id,
+	callId: z.string().optional(),
+	command: z.string(),
+	cwd: z.string(),
+	status: shellJobStatusSchema,
+	detached: z.boolean(),
+	output: z.string(),
+	exitCode: z.number().nullable(),
+	result: z.unknown(),
+	reported: z.boolean(),
+	createdAt: z.number(),
+	updatedAt: z.number(),
+	completedAt: z.number().nullable(),
+});
+const planItemSchema = z.object({
+	step: id,
+	status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']),
 });
 
-const payloadSchemas: Record<ServerEventType, z.ZodType> = {
-	'tool.approval.required': z.looseObject({
-		callId: z.string().min(1),
-		toolName: z.string().min(1),
-		args: z.unknown(),
-		messageId: z.string().min(1),
-	}),
-	'tool.approval.updated': z.looseObject({
-		callId: z.string().min(1),
-		toolName: z.string().min(1),
-		args: z.unknown(),
-		messageId: z.string().min(1),
-	}),
+export const serverEventPayloadSchemas = {
+	'tool.approval.required': approvalRequiredSchema,
+	'tool.approval.updated': approvalRequiredSchema,
 	'tool.approval.resolved': z.looseObject({
-		callId: z.string().min(1),
-		toolName: z.string().min(1),
+		callId: id,
+		toolName: id,
 		approved: z.boolean(),
 		reason: z.enum(['timeout', 'user_approved', 'user_rejected']),
 	}),
 	'shell.secure_input.required': z.looseObject({
-		promptId: z.string().min(1),
-		messageId: z.string().min(1),
+		promptId: id,
+		messageId: id,
+		callId: z.string().optional(),
 		prompt: z.string(),
 		inputKind: z.enum(['text', 'password']),
 		allowRemember: z.boolean(),
 	}),
 	'shell.secure_input.resolved': z.looseObject({
-		promptId: z.string().min(1),
-		messageId: z.string().min(1),
+		promptId: id,
+		messageId: id,
+		callId: z.string().optional(),
 		cancelled: z.boolean(),
 		reason: z.enum(['timeout', 'user_cancelled', 'user_submitted']),
 	}),
-	'ottorouter.payment.required': z.looseObject({
-		amountUsd: z.number(),
-		currentBalance: z.number().optional(),
-	}),
-	'ottorouter.payment.signing': objectPayload,
+	'ottorouter.payment.required': paymentRequiredSchema,
+	'ottorouter.payment.signing': z.object({}),
 	'ottorouter.payment.complete': z.looseObject({
 		amountUsd: z.number(),
 		newBalance: z.number(),
+		transactionId: z.string().optional(),
 	}),
 	'ottorouter.payment.error': z.looseObject({ error: z.string() }),
-	'ottorouter.topup.required': z.looseObject({
-		amountUsd: z.number(),
+	'ottorouter.topup.required': paymentRequiredSchema.extend({
+		messageId: z.string().optional(),
 		currentBalance: z.number(),
 		minTopupUsd: z.number(),
 		suggestedTopupUsd: z.number(),
@@ -386,63 +91,108 @@ const payloadSchemas: Record<ServerEventType, z.ZodType> = {
 	'ottorouter.topup.method_selected': z.looseObject({ method: z.string() }),
 	'ottorouter.topup.cancelled': z.looseObject({ reason: z.string() }),
 	'ottorouter.fiat.checkout_created': z.looseObject({
-		messageId: z.string().min(1),
+		messageId: id,
 		needsTopup: z.boolean(),
 	}),
 	'ottorouter.balance.updated': z.looseObject({
 		costUsd: z.number(),
 		balanceRemaining: z.number(),
+		inputTokens: z.number().optional(),
+		outputTokens: z.number().optional(),
 	}),
 	'session.created': idPayload,
-	'session.deleted': idPayload,
+	'session.deleted': z.object({ id }),
 	'session.updated': idPayload,
-	'message.created': idPayload,
-	'message.updated': z.looseObject({
-		id: z.string().min(1),
-		status: z.string().min(1),
+	'message.created': idPayload.extend({
+		sessionId: z.string().optional(),
+		role: z.enum(['user', 'assistant', 'system']).optional(),
+		status: z.string().optional(),
+		agent: z.string().optional(),
+		provider: z.string().optional(),
+		model: z.string().optional(),
+		createdAt: z.union([z.string(), z.number()]).optional(),
+		completedAt: z.union([z.string(), z.number()]).optional(),
+		content: z.string().optional(),
+		attachmentNames: z.array(z.string()).optional(),
+		providerStreamRetry: z.boolean().optional(),
+		maxOutputContinuation: z.boolean().optional(),
 	}),
-	'message.part.delta': messagePartPayload,
-	'reasoning.delta': messagePartPayload.extend({
+	'message.updated': idPayload.extend({
+		status: id,
+		error: z.string().optional(),
+	}),
+	'message.part.delta': z.looseObject({
+		messageId: id,
+		partId: id,
+		stepIndex,
+		delta: z.string().optional(),
+		type: z.string().optional(),
+		content: z.string().optional(),
+	}),
+	'reasoning.delta': z.looseObject({
+		messageId: id,
+		partId: id,
 		stepIndex: z.number().int(),
 		delta: z.string(),
 	}),
-	'message.completed': idPayload,
+	'message.completed': idPayload.extend({
+		usage: z.unknown().optional(),
+		costUsd: z.number().optional(),
+		finishReason: z.string().optional(),
+		rawFinishReason: z.string().optional(),
+		autoCompacted: z.boolean().optional(),
+		providerStreamRetry: z.boolean().optional(),
+		fiatTopupRequired: z.boolean().optional(),
+		preemptedBy: z.string().optional(),
+		status: z.string().optional(),
+	}),
 	'tool.call': z.looseObject({
-		name: z.string().min(1),
-		callId: z.string().min(1),
-		messageId: z.string().min(1),
+		...boundedEventValueMetadataSchema.shape,
+		name: id,
+		callId: id,
+		messageId: id,
 		args: z.unknown(),
+		stepIndex,
+		index: z.number().optional(),
 	}),
 	'tool.delta': z.looseObject({
-		name: z.string().min(1),
-		channel: z.string().min(1),
+		name: id,
+		channel: id,
 		delta: z.unknown(),
-		messageId: z.string().min(1),
+		messageId: id,
+		stepIndex,
+		callId: z.string().optional(),
+		deltaTruncated: z.boolean().optional(),
+		deltaOriginalBytes: z.number().optional(),
 	}),
 	'tool.result': z.looseObject({
-		name: z.string().min(1),
-		messageId: z.string().min(1),
+		...boundedEventValueMetadataSchema.shape,
+		name: id,
+		messageId: id,
 		result: z.unknown(),
+		callId: z.string().optional(),
+		stepIndex,
+		args: z.unknown().optional(),
+		artifact: z.unknown().optional(),
 	}),
-	'shell.job.updated': z.looseObject({ job: objectPayload }),
+	'shell.job.updated': z.looseObject({ job: shellJobSnapshotSchema }),
 	'shell.job.output': z.looseObject({
-		jobId: z.string().min(1),
+		jobId: id,
 		delta: z.string(),
 		updatedAt: z.number(),
 	}),
 	'plan.updated': z.looseObject({
-		items: z.array(
-			z.object({
-				step: z.string().min(1),
-				status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']),
-			}),
-		),
+		items: z.array(planItemSchema),
+		note: z.string().optional(),
 	}),
-	'goal.updated': z.looseObject({
-		goalId: z.string().min(1),
-		changes: z.array(z.string()),
+	'goal.updated': z.looseObject({ goalId: id, changes: z.array(z.string()) }),
+	'finish-step': z.looseObject({
+		stepIndex,
+		usage: z.unknown().optional(),
+		finishReason: z.string().optional(),
+		response: z.unknown().optional(),
+		reason: z.literal('no-tool-calls').optional(),
 	}),
-	'finish-step': objectPayload,
 	usage: z.looseObject({ stepIndex: z.number().int() }),
 	'queue.updated': z.looseObject({
 		currentMessageId: z.string().nullable(),
@@ -451,113 +201,189 @@ const payloadSchemas: Record<ServerEventType, z.ZodType> = {
 		isRunning: z.boolean(),
 	}),
 	error: z.looseObject({
-		messageId: z.string().min(1),
+		messageId: id,
+		partId: z.string().optional(),
+		message: z.string().optional(),
+		type: z.string().optional(),
+		error: z.string().optional(),
+		errorType: z.string().optional(),
+		details: z.unknown().optional(),
 		isAborted: z.boolean(),
+		autoCompacted: z.boolean().optional(),
+		stepsCompleted: z.number().optional(),
 	}),
-	heartbeat: z.looseObject({ createdAt: z.string().min(1) }),
+	heartbeat: z.looseObject({ createdAt: id }),
 };
 
-const serverEventEnvelopeSchema = z.object({
-	type: serverEventTypeSchema,
-	sessionId: z.string().min(1),
-	projectId: z.string().optional(),
-	projectRoot: z.string().optional(),
-	payload: z.unknown(),
-});
+export const serverEventTypeSchema = z.enum(
+	Object.keys(serverEventPayloadSchemas) as [
+		keyof typeof serverEventPayloadSchemas,
+		...(keyof typeof serverEventPayloadSchemas)[],
+	],
+);
+export type ServerEventType = z.infer<typeof serverEventTypeSchema>;
+/** @deprecated Use ServerEventType. */
+export type OttoEventType = ServerEventType;
+export type ServerEventPayloadMap = {
+	[T in ServerEventType]: z.infer<(typeof serverEventPayloadSchemas)[T]>;
+};
 
-function isValidServerEvent(value: unknown): value is ServerEvent {
-	const envelope = serverEventEnvelopeSchema.safeParse(value);
-	return (
-		envelope.success &&
-		payloadSchemas[envelope.data.type].safeParse(envelope.data.payload).success
-	);
+function eventVariant<T extends ServerEventType>(type: T) {
+	return z.object({
+		type: z.literal(type),
+		sessionId: id,
+		projectId: z.string().optional(),
+		projectRoot: z.string().optional(),
+		payload: serverEventPayloadSchemas[type],
+	});
 }
 
-export const serverEventSchema = z.custom<ServerEvent>(isValidServerEvent, {
-	message: 'Invalid server event envelope or payload',
-});
+// The tuple preserves each discriminator's payload type when constructing the union.
+const eventVariants = <
+	T extends readonly [ServerEventType, ...ServerEventType[]],
+>(
+	...types: T
+) =>
+	types.map((type) => eventVariant(type)) as {
+		[K in keyof T]: ReturnType<typeof eventVariant<T[K]>>;
+	};
+export const serverEventSchema = z.discriminatedUnion(
+	'type',
+	eventVariants(
+		'tool.approval.required',
+		'tool.approval.updated',
+		'tool.approval.resolved',
+		'shell.secure_input.required',
+		'shell.secure_input.resolved',
+		'ottorouter.payment.required',
+		'ottorouter.payment.signing',
+		'ottorouter.payment.complete',
+		'ottorouter.payment.error',
+		'ottorouter.topup.required',
+		'ottorouter.topup.method_selected',
+		'ottorouter.topup.cancelled',
+		'ottorouter.fiat.checkout_created',
+		'ottorouter.balance.updated',
+		'session.created',
+		'session.deleted',
+		'session.updated',
+		'message.created',
+		'message.updated',
+		'message.part.delta',
+		'reasoning.delta',
+		'message.completed',
+		'tool.call',
+		'tool.delta',
+		'tool.result',
+		'shell.job.updated',
+		'shell.job.output',
+		'plan.updated',
+		'goal.updated',
+		'finish-step',
+		'usage',
+		'queue.updated',
+		'error',
+		'heartbeat',
+	),
+);
+export type ServerEvent<T extends ServerEventType = ServerEventType> = Extract<
+	z.infer<typeof serverEventSchema>,
+	{ type: T }
+>;
+/** @deprecated Use ServerEvent. */
+export type OttoEvent<T extends ServerEventType = ServerEventType> =
+	ServerEvent<T>;
+
+export type ToolApprovalRequiredPayload =
+	ServerEventPayloadMap['tool.approval.required'];
+export type ToolApprovalUpdatedPayload =
+	ServerEventPayloadMap['tool.approval.updated'];
+export type ToolApprovalResolvedPayload =
+	ServerEventPayloadMap['tool.approval.resolved'];
+export type SecureInputRequiredPayload =
+	ServerEventPayloadMap['shell.secure_input.required'];
+export type SecureInputResolvedPayload =
+	ServerEventPayloadMap['shell.secure_input.resolved'];
+export type PaymentRequiredPayload =
+	ServerEventPayloadMap['ottorouter.payment.required'];
+export type PaymentCompletePayload =
+	ServerEventPayloadMap['ottorouter.payment.complete'];
+export type BalanceUpdatedPayload =
+	ServerEventPayloadMap['ottorouter.balance.updated'];
+export type PaymentErrorPayload =
+	ServerEventPayloadMap['ottorouter.payment.error'];
+export type TopupRequiredPayload =
+	ServerEventPayloadMap['ottorouter.topup.required'];
+export type FiatCheckoutCreatedPayload =
+	ServerEventPayloadMap['ottorouter.fiat.checkout_created'];
+export type SessionPayload = ServerEventPayloadMap['session.created'];
+export type MessageCreatedPayload = ServerEventPayloadMap['message.created'];
+export type MessageUpdatedPayload = ServerEventPayloadMap['message.updated'];
+export type MessagePartDeltaPayload =
+	ServerEventPayloadMap['message.part.delta'];
+export type ReasoningDeltaPayload = ServerEventPayloadMap['reasoning.delta'];
+export type MessageCompletedPayload =
+	ServerEventPayloadMap['message.completed'];
+export type BoundedEventValueMetadata = z.infer<
+	typeof boundedEventValueMetadataSchema
+>;
+export type ToolCallPayload = ServerEventPayloadMap['tool.call'];
+export type ToolDeltaPayload = ServerEventPayloadMap['tool.delta'];
+export type ToolResultPayload = ServerEventPayloadMap['tool.result'];
+export type ShellJobStatus = z.infer<typeof shellJobStatusSchema>;
+export type ShellJobSnapshot = z.infer<typeof shellJobSnapshotSchema>;
+export type PlanItem = z.infer<typeof planItemSchema>;
+export type PlanUpdatedPayload = ServerEventPayloadMap['plan.updated'];
+export type GoalUpdatedPayload = ServerEventPayloadMap['goal.updated'];
+export type FinishStepPayload = ServerEventPayloadMap['finish-step'];
+export type UsagePayload = ServerEventPayloadMap['usage'];
+export type QueueUpdatedPayload = ServerEventPayloadMap['queue.updated'];
+export type ErrorPayload = ServerEventPayloadMap['error'];
 
 export function parseServerEvent(value: unknown): ServerEvent {
 	return serverEventSchema.parse(value);
 }
-
 export function parseServerEventJson(raw: string): ServerEvent {
 	return parseServerEvent(JSON.parse(raw));
 }
 
-export type NotificationLevel = 'info' | 'success' | 'warning' | 'error';
-
-export interface NotificationAction {
-	label: string;
-	href: string;
-}
-
-export interface NotificationEvent {
-	id: string;
-	level: NotificationLevel;
-	title: string;
-	body?: string;
-	action?: NotificationAction;
-	createdAt: string;
-	expiresAt?: string;
-	source?: 'agent' | 'system' | 'session' | 'auth' | 'billing';
-	sessionId?: string;
-	projectId?: string;
-	projectRoot?: string;
-}
-
-export interface SessionStatusEvent {
-	sessionId: string;
-	projectId?: string;
-	projectRoot?: string;
-	status: 'running' | 'completed' | 'failed' | 'needs_attention';
-	messageId?: string;
-	createdAt: string;
-}
-
-export interface ReferencePreparationEvent {
-	name: string;
-	url: string;
-	ref?: string;
-	projectRoot: string;
-	status: 'cloning' | 'available' | 'error';
-	error?: string;
-	output?: string[];
-}
-
 const notificationEventSchema = z.object({
-	id: z.string().min(1),
+	id,
 	level: z.enum(['info', 'success', 'warning', 'error']),
-	title: z.string().min(1),
+	title: id,
 	body: z.string().optional(),
 	action: z.object({ label: z.string(), href: z.string() }).optional(),
-	createdAt: z.string().min(1),
+	createdAt: id,
 	expiresAt: z.string().optional(),
 	source: z.enum(['agent', 'system', 'session', 'auth', 'billing']).optional(),
 	sessionId: z.string().optional(),
 	projectId: z.string().optional(),
 	projectRoot: z.string().optional(),
 });
-
 const sessionStatusEventSchema = z.object({
-	sessionId: z.string().min(1),
+	sessionId: id,
 	projectId: z.string().optional(),
 	projectRoot: z.string().optional(),
 	status: z.enum(['running', 'completed', 'failed', 'needs_attention']),
 	messageId: z.string().optional(),
-	createdAt: z.string().min(1),
+	createdAt: id,
 });
-
 const referencePreparationEventSchema = z.object({
-	name: z.string().min(1),
-	url: z.string().min(1),
+	name: id,
+	url: id,
 	ref: z.string().optional(),
-	projectRoot: z.string().min(1),
+	projectRoot: id,
 	status: z.enum(['cloning', 'available', 'error']),
 	error: z.string().optional(),
 	output: z.array(z.string()).optional(),
 });
-
+export type NotificationEvent = z.infer<typeof notificationEventSchema>;
+export type NotificationLevel = NotificationEvent['level'];
+export type NotificationAction = NonNullable<NotificationEvent['action']>;
+export type SessionStatusEvent = z.infer<typeof sessionStatusEventSchema>;
+export type ReferencePreparationEvent = z.infer<
+	typeof referencePreparationEventSchema
+>;
 export const clientEventSchema = z.discriminatedUnion('type', [
 	z.object({
 		type: z.literal('notification'),
@@ -573,16 +399,22 @@ export const clientEventSchema = z.discriminatedUnion('type', [
 	}),
 	z.object({
 		type: z.literal('heartbeat'),
-		payload: z.object({ createdAt: z.string().min(1) }),
+		payload: z.object({ createdAt: id }),
 	}),
 ]);
-
 export type ClientEvent = z.infer<typeof clientEventSchema>;
-
 export function parseClientEvent(value: unknown): ClientEvent {
 	return clientEventSchema.parse(value);
 }
-
 export function parseClientEventJson(raw: string): ClientEvent {
 	return parseClientEvent(JSON.parse(raw));
 }
+
+export const replayMissedSchema = z.object({ lastEventId: z.string() });
+export const truncatedPayloadSchema = z.looseObject({
+	streamPayloadTruncated: z.literal(true),
+	streamPayloadOriginalBytes: z.number().optional(),
+	streamPayloadOmitted: z.boolean().optional(),
+});
+export type ReplayMissedPayload = z.infer<typeof replayMissedSchema>;
+export type TruncatedStreamPayload = z.infer<typeof truncatedPayloadSchema>;

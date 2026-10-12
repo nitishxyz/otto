@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { toErrorMessage } from '../../errors/handling.ts';
 import type { TurnDumpCollectorOptions, TurnDumpData } from './types.ts';
+import { snapshot } from './snapshot.ts';
 
 export class TurnDumpCollector {
 	private data: TurnDumpData;
@@ -45,26 +46,26 @@ export class TurnDumpCollector {
 
 	setSystemPrompt(prompt: string, components: string[]) {
 		this.data.system = {
-			prompt,
-			components,
+			prompt: snapshot(prompt),
+			components: snapshot(components),
 			length: prompt.length,
 		};
 	}
 
 	setAdditionalSystemMessages(msgs: Array<{ role: string; content: string }>) {
-		this.data.additionalSystemMessages = msgs;
+		this.data.additionalSystemMessages = snapshot(msgs);
 	}
 
 	setHistory(history: Array<{ role: string; content: unknown }>) {
-		this.data.history = history.map((message) => {
+		this.data.history = snapshot(history).map((message) => {
 			const contentStr =
 				typeof message.content === 'string'
 					? message.content
 					: JSON.stringify(message.content);
 			return {
 				role: message.role,
-				content: message.content,
-				_contentLength: contentStr.length,
+				content: snapshot(message.content),
+				_contentLength: contentStr?.length ?? 0,
 			};
 		});
 	}
@@ -72,21 +73,21 @@ export class TurnDumpCollector {
 	setFinalMessages(
 		messages: Array<{ role: string; content: string | Array<unknown> }>,
 	) {
-		this.data.finalMessages = messages.map((message) => {
+		this.data.finalMessages = snapshot(messages).map((message) => {
 			const contentStr =
 				typeof message.content === 'string'
 					? message.content
 					: JSON.stringify(message.content);
 			return {
 				role: message.role,
-				content: message.content,
-				_contentLength: contentStr.length,
+				content: snapshot(message.content),
+				_contentLength: contentStr?.length ?? 0,
 			};
 		});
 	}
 
 	setTools(toolset: Record<string, unknown>) {
-		const names = Object.keys(toolset);
+		const names = snapshot(Object.keys(toolset));
 		this.data.tools = { names, count: names.length };
 	}
 
@@ -97,7 +98,7 @@ export class TurnDumpCollector {
 		isOpenAIOAuth: boolean;
 		needsSpoof: boolean;
 	}) {
-		this.data.modelConfig = config;
+		this.data.modelConfig = snapshot(config);
 	}
 
 	recordToolCall(
@@ -106,11 +107,12 @@ export class TurnDumpCollector {
 		callId: string,
 		args: unknown,
 	) {
+		if (this.data.stream.toolCalls.length >= 200) return;
 		this.data.stream.toolCalls.push({
 			stepIndex,
 			name,
 			callId,
-			args,
+			args: snapshot(args),
 			timestamp: new Date().toISOString(),
 		});
 	}
@@ -121,12 +123,9 @@ export class TurnDumpCollector {
 		callId: string,
 		result: unknown,
 	) {
-		const resultStr =
-			typeof result === 'string' ? result : JSON.stringify(result);
-		const truncated =
-			resultStr.length > 50_000
-				? `${resultStr.slice(0, 50_000)}...[TRUNCATED]`
-				: result;
+		if (this.data.stream.toolResults.length >= 200) return;
+		const truncated = snapshot(result);
+		const resultStr = JSON.stringify(truncated) ?? '';
 		this.data.stream.toolResults.push({
 			stepIndex,
 			name,
@@ -142,6 +141,7 @@ export class TurnDumpCollector {
 		accumulated: string,
 		opts?: { force?: boolean },
 	) {
+		if (this.data.stream.textDeltas.length >= 200) return;
 		const force = opts?.force === true;
 		const now = Date.now();
 		if (
@@ -158,13 +158,13 @@ export class TurnDumpCollector {
 			return;
 		}
 		this.lastTextSnapshotTime = now;
-		this.lastTextSnapshot = accumulated;
+		this.lastTextSnapshot = snapshot(accumulated.slice(0, 5000));
 		this.data.stream.textDeltas.push({
 			stepIndex,
 			textSnapshot:
 				accumulated.length > 5000
-					? `${accumulated.slice(0, 5000)}...[TRUNCATED at 5000 chars, total: ${accumulated.length}]`
-					: accumulated,
+					? `${snapshot(accumulated.slice(0, 5000))}...[TRUNCATED at 5000 chars, total: ${accumulated.length}]`
+					: snapshot(accumulated),
 			length: accumulated.length,
 			timestamp: new Date().toISOString(),
 		});
@@ -175,10 +175,11 @@ export class TurnDumpCollector {
 		finishReason: string | undefined,
 		usage?: { inputTokens?: number; outputTokens?: number },
 	) {
+		if (this.data.stream.steps.length >= 200) return;
 		this.data.stream.steps.push({
 			stepIndex,
 			finishReason,
-			usage,
+			usage: snapshot(usage),
 			timestamp: new Date().toISOString(),
 		});
 	}
@@ -195,9 +196,9 @@ export class TurnDumpCollector {
 
 	recordError(err: unknown) {
 		this.data.error = {
-			message: toErrorMessage(err),
+			message: snapshot(toErrorMessage(err)),
 			name: err instanceof Error ? err.name : undefined,
-			stack: err instanceof Error ? err.stack : undefined,
+			stack: err instanceof Error ? snapshot(err.stack) : undefined,
 		};
 	}
 
@@ -213,11 +214,14 @@ export class TurnDumpCollector {
 			.replace(/[:.]/g, '-')
 			.replace('T', '_')
 			.replace('Z', '');
-		const sessionShort = this.data.sessionId.slice(0, 8);
-		const filename = `turn_${ts}_${sessionShort}.json`;
+		const sessionShort = this.data.sessionId
+			.slice(0, 8)
+			.replace(/[^a-zA-Z0-9_-]/g, '_');
+		const messageId = this.data.messageId.replace(/[^a-zA-Z0-9_-]/g, '_');
+		const filename = `turn_${ts}_${sessionShort}_${messageId}.json`;
 		const filepath = join(dumpDir, filename);
 
-		await Bun.write(filepath, JSON.stringify(this.data, null, 2));
+		await Bun.write(filepath, JSON.stringify(snapshot(this.data), null, 2));
 		return filepath;
 	}
 }

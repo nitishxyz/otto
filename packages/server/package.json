@@ -59,10 +59,6 @@
 			"import": "./src/runtime/tools/approval.ts",
 			"types": "./src/runtime/tools/approval.ts"
 		},
-		"./runtime/ask-service.ts": {
-			"import": "./src/runtime/ask-service.ts",
-			"types": "./src/runtime/ask-service.ts"
-		},
 		"./routes/ask.ts": {
 			"import": "./src/routes/ask.ts",
 			"types": "./src/routes/ask.ts"

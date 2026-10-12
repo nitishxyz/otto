@@ -47,8 +47,22 @@ export function createAbortedToolResult(): {
 	};
 }
 
+export function createUnjournaledToolResult(): {
+	ok: false;
+	error: string;
+	details: { reason: 'durability_unavailable' };
+} {
+	return {
+		ok: false,
+		error:
+			'Tool was not executed: its result could not be made restart-durable (tool journal unavailable)',
+		details: { reason: 'durability_unavailable' },
+	};
+}
+
 export function createToolExceptionResult(error: unknown): unknown {
-	if (error && typeof error === 'object' && 'ok' in error) return error;
+	if (error && typeof error === 'object' && 'ok' in error && error.ok === false)
+		return error;
 	const errorMessage = stringifyUnknownError(error);
 	const errorStack = error instanceof Error ? error.stack : undefined;
 	return {

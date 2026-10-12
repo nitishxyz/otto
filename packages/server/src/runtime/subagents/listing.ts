@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, ne } from 'drizzle-orm';
 import type { DB } from '@ottocode/database';
 import { subagents } from '@ottocode/database/schema';
 import type { SubagentRecord } from './types.ts';
@@ -18,18 +18,40 @@ export async function listSubagentsForSession(
 /**
  * Marks sub-agent records as reported, e.g. when the parent agent has already
  * seen their summaries via subagent action=list, so the idle hook does not deliver
- * the same results again.
+ * the same results again. When full records are passed, only the exact
+ * version that was seen is acknowledged (compare-and-set), so a newer result
+ * produced concurrently is still delivered. Running records are never marked.
  */
 export async function markSubagentsReported(
 	db: DB,
-	ids: string[],
+	seen: Array<string | Pick<SubagentRecord, 'id' | 'status' | 'updatedAt'>>,
 ): Promise<void> {
-	if (!ids.length) return;
-	const now = Date.now();
-	for (const id of ids) {
-		await db
-			.update(subagents)
-			.set({ reported: true, updatedAt: now })
-			.where(eq(subagents.id, id));
+	for (const item of seen) {
+		if (typeof item === 'string') {
+			db.update(subagents)
+				.set({
+					reported: true,
+					deliveryState: 'delivered',
+					deliveryKey: 'subagent-list',
+				})
+				.where(and(eq(subagents.id, item), ne(subagents.status, 'running')))
+				.run();
+			continue;
+		}
+		if (item.status === 'running') continue;
+		db.update(subagents)
+			.set({
+				reported: true,
+				deliveryState: 'delivered',
+				deliveryKey: 'subagent-list',
+			})
+			.where(
+				and(
+					eq(subagents.id, item.id),
+					eq(subagents.status, item.status),
+					eq(subagents.updatedAt, item.updatedAt),
+				),
+			)
+			.run();
 	}
 }

@@ -63,31 +63,89 @@ export async function listForgeAuth(projectRoot: string) {
 	);
 }
 
-function scheduleDevicePolling(
+/** A poll either stays pending or yields the credential write to commit. */
+type DevicePollResult = 'pending' | (() => Promise<void>);
+
+type DeviceSession = {
+	id: string;
+	cancelled: boolean;
+	timer?: ReturnType<typeof setTimeout>;
+	committing?: Promise<void>;
+};
+
+/** Active device-poll sessions keyed by credential identity. */
+const deviceSessions = new Map<string, DeviceSession>();
+
+function deviceIdentity(provider: ProviderId): string {
+	return `global:${provider}`;
+}
+
+/**
+ * Cancels the active device flow for a credential identity and waits for an
+ * in-flight credential write to settle, so a later logout cannot be undone by
+ * a stale flow.
+ */
+export async function cancelForgeDeviceFlow(
+	provider: ProviderId,
+): Promise<boolean> {
+	const key = deviceIdentity(provider);
+	const session = deviceSessions.get(key);
+	if (!session) return false;
+	session.cancelled = true;
+	if (session.timer) clearTimeout(session.timer);
+	deviceSessions.delete(key);
+	await session.committing?.catch(() => {});
+	return true;
+}
+
+async function scheduleDevicePolling(
 	provider: ProviderId,
 	intervalSeconds: number,
-	poll: () => Promise<'pending' | 'complete'>,
-): void {
+	poll: () => Promise<DevicePollResult>,
+): Promise<void> {
+	await cancelForgeDeviceFlow(provider);
+	const key = deviceIdentity(provider);
+	const session: DeviceSession = { id: crypto.randomUUID(), cancelled: false };
+	deviceSessions.set(key, session);
 	const startedAt = Date.now();
+	const finish = () => {
+		if (deviceSessions.get(key) === session) deviceSessions.delete(key);
+	};
+	const schedule = () => {
+		if (session.cancelled) return;
+		session.timer = setTimeout(
+			() => void run(),
+			Math.max(intervalSeconds, 1) * 1000,
+		);
+	};
 	const run = async () => {
+		if (session.cancelled) return;
 		if (Date.now() - startedAt >= DEVICE_FLOW_TIMEOUT_MS) {
 			logger.warn(`${provider} OAuth device flow timed out`);
+			finish();
 			return;
 		}
 		try {
-			if ((await poll()) === 'complete') return;
+			const result = await poll();
+			if (session.cancelled) return;
+			if (result === 'pending') {
+				schedule();
+				return;
+			}
+			session.committing = result();
+			await session.committing;
+			finish();
 		} catch (error) {
 			logger.error(`${provider} OAuth device flow failed`, error);
-			return;
+			finish();
 		}
-		setTimeout(() => void run(), Math.max(intervalSeconds, 1) * 1000);
 	};
-	setTimeout(() => void run(), Math.max(intervalSeconds, 1) * 1000);
+	schedule();
 }
 
 async function startOpenAIDeviceFlow(projectRoot: string) {
 	const device = await requestOpenAIDeviceCode();
-	scheduleDevicePolling('openai', device.interval, async () => {
+	await scheduleDevicePolling('openai', device.interval, async () => {
 		const result = await pollOpenAIDeviceCodeOnce(
 			device.deviceAuthId,
 			device.userCode,
@@ -98,20 +156,20 @@ async function startOpenAIDeviceFlow(projectRoot: string) {
 			result.code,
 			result.codeVerifier,
 		);
-		await setAuth(
-			'openai',
-			{
-				type: 'oauth',
-				refresh: tokens.refresh,
-				access: tokens.access,
-				expires: tokens.expires,
-				accountId: tokens.accountId,
-				idToken: tokens.idToken,
-			},
-			projectRoot,
-			'global',
-		);
-		return 'complete';
+		return () =>
+			setAuth(
+				'openai',
+				{
+					type: 'oauth',
+					refresh: tokens.refresh,
+					access: tokens.access,
+					expires: tokens.expires,
+					accountId: tokens.accountId,
+					idToken: tokens.idToken,
+				},
+				projectRoot,
+				'global',
+			);
 	});
 	return {
 		provider: 'openai',
@@ -124,17 +182,17 @@ async function startOpenAIDeviceFlow(projectRoot: string) {
 
 async function startOttoRouterDeviceFlow(projectRoot: string) {
 	const device = await requestOttoRouterDeviceCode();
-	scheduleDevicePolling('ottorouter', device.interval, async () => {
+	await scheduleDevicePolling('ottorouter', device.interval, async () => {
 		const result = await pollOttoRouterDeviceCodeOnce(device.deviceCode);
 		if (result.status === 'pending') return 'pending';
 		if (result.status === 'error') throw new Error(result.error);
-		await setAuth(
-			'ottorouter',
-			{ type: 'oauth', ...result.tokens },
-			projectRoot,
-			'global',
-		);
-		return 'complete';
+		return () =>
+			setAuth(
+				'ottorouter',
+				{ type: 'oauth', ...result.tokens },
+				projectRoot,
+				'global',
+			);
 	});
 	return {
 		provider: 'ottorouter',
@@ -147,17 +205,17 @@ async function startOttoRouterDeviceFlow(projectRoot: string) {
 
 async function startKimiDeviceFlow(projectRoot: string) {
 	const device = await requestKimiDeviceCode();
-	scheduleDevicePolling('kimi', device.interval, async () => {
+	await scheduleDevicePolling('kimi', device.interval, async () => {
 		const result = await pollKimiDeviceCodeOnce(device.deviceCode);
 		if (result.status === 'pending') return 'pending';
 		if (result.status === 'error') throw new Error(result.error);
-		await setAuth(
-			'kimi',
-			{ type: 'oauth', ...result.tokens },
-			projectRoot,
-			'global',
-		);
-		return 'complete';
+		return () =>
+			setAuth(
+				'kimi',
+				{ type: 'oauth', ...result.tokens },
+				projectRoot,
+				'global',
+			);
 	});
 	return {
 		provider: 'kimi',
@@ -170,17 +228,17 @@ async function startKimiDeviceFlow(projectRoot: string) {
 
 async function startCopilotDeviceFlow(projectRoot: string) {
 	const device = await authorizeCopilot();
-	scheduleDevicePolling('copilot', device.interval, async () => {
+	await scheduleDevicePolling('copilot', device.interval, async () => {
 		const result = await pollForCopilotTokenOnce(device.deviceCode);
 		if (result.status === 'pending') return 'pending';
 		if (result.status === 'error') throw new Error(result.error);
-		await setAuth(
-			'copilot',
-			{ type: 'api', key: result.accessToken },
-			projectRoot,
-			'global',
-		);
-		return 'complete';
+		return () =>
+			setAuth(
+				'copilot',
+				{ type: 'api', key: result.accessToken },
+				projectRoot,
+				'global',
+			);
 	});
 	return {
 		provider: 'copilot',
@@ -236,6 +294,7 @@ export async function runForgeAuthAction(
 			changes: [`Remove stored ${provider} credentials`],
 		};
 		if (input.dryRun) return { ok: true, applied: false, plan };
+		await cancelForgeDeviceFlow(provider);
 		if (provider === 'ottorouter') {
 			await stopTunnel({ mode: 'managed', scope: 'remote-control' });
 		}
@@ -274,6 +333,7 @@ export async function runForgeAuthAction(
 	if (method === 'api-key') {
 		if (!input.apiKey)
 			throw new Error('apiKey is required for API-key authentication');
+		await cancelForgeDeviceFlow(provider);
 		await setAuth(
 			provider,
 			{ type: 'api', key: input.apiKey },

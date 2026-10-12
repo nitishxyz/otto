@@ -120,7 +120,7 @@ describe('bounded server streams', () => {
 		expect(Buffer.byteLength(finalChunk.result.stdout)).toBe(1_024);
 	});
 
-	test('consumeToolStream returns only the explicit result or last chunk', async () => {
+	test('consumeToolStream returns only the explicit result or a failure', async () => {
 		async function* withResult() {
 			for (let index = 0; index < 10_000; index++) yield { index };
 			yield { result: { ok: true } };
@@ -142,6 +142,9 @@ describe('bounded server streams', () => {
 				stream: withoutResult(),
 				name: 'test',
 			}),
-		).toEqual({ last: true });
+		).toMatchObject({
+			ok: false,
+			details: { reason: 'missing_terminal_result' },
+		});
 	});
 });

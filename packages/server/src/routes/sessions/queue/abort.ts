@@ -52,7 +52,7 @@ export function registerAbortSessionRoute(app: Hono) {
 			);
 
 			if (messageId) {
-				const result = abortMessage(sessionId, messageId);
+				const result = abortMessage(sessionId, messageId, project.projectRoot);
 				return c.json({
 					success: result.removed,
 					wasRunning: result.wasRunning,
@@ -60,7 +60,7 @@ export function registerAbortSessionRoute(app: Hono) {
 				});
 			}
 
-			abortSession(sessionId, clearQueue);
+			abortSession(sessionId, clearQueue, undefined, project.projectRoot);
 			try {
 				const { db } = project;
 				const { abortChildSubagents } = await import(

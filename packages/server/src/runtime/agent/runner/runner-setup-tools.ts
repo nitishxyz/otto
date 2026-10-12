@@ -1,5 +1,5 @@
-import { getConfiguredProviderModels, type OttoConfig } from '@ottocode/sdk';
-import type { DiscoveredTool, ModelInfo } from '@ottocode/sdk';
+import type { OttoConfig } from '@ottocode/sdk';
+import type { DiscoveredTool } from '@ottocode/sdk';
 import type { RunOpts } from '../../session/queue.ts';
 
 const EDITING_TOOL_NAMES = [
@@ -9,54 +9,8 @@ const EDITING_TOOL_NAMES = [
 	'copy_into',
 	'apply_patch',
 ];
+const PREFERRED_EDITING_TOOLS = ['apply_patch', 'write', 'edit', 'multiedit'];
 const MODEL_FAMILY_EDIT_TOOL_POLICY_AGENTS = new Set(['build']);
-
-const LOWER_TIER_MODEL_PATTERNS = [
-	/(^|[-_/])fast($|[-_/])/,
-	/(^|[-_/])flash($|[-_/])/,
-	/(^|[-_/])mini($|[-_/])/,
-	/(^|[-_/])nano($|[-_/])/,
-	/(^|[-_/])lite($|[-_/])/,
-	/(^|[-_/])small($|[-_/])/,
-	/(^|[-_/])haiku($|[-_/])/,
-	/(^|[-_/])composer($|[-_/])/,
-] as const;
-
-const STRUCTURED_EDIT_COST_LIMIT = { input: 1, output: 5 } as const;
-
-function findConfiguredModelInfo(
-	cfg: OttoConfig | undefined,
-	provider: RunOpts['provider'],
-	model: string,
-): ModelInfo | undefined {
-	if (!cfg) return undefined;
-	return getConfiguredProviderModels(cfg, provider)[model];
-}
-
-function isLowCostModel(modelInfo: ModelInfo | undefined): boolean {
-	const cost = modelInfo?.cost;
-	if (!cost) return false;
-	return (
-		cost.input !== undefined &&
-		cost.output !== undefined &&
-		cost.input <= STRUCTURED_EDIT_COST_LIMIT.input &&
-		cost.output <= STRUCTURED_EDIT_COST_LIMIT.output
-	);
-}
-
-function shouldUseStructuredEditTools(
-	model: string,
-	modelInfo: ModelInfo | undefined,
-): boolean {
-	if (modelInfo?.editToolCapability === 'structured') return true;
-	if (modelInfo?.editToolCapability === 'patch') return false;
-	if (isLowCostModel(modelInfo)) return true;
-
-	const normalizedModel = model.toLowerCase();
-	return LOWER_TIER_MODEL_PATTERNS.some((pattern) =>
-		pattern.test(normalizedModel),
-	);
-}
 
 function normalizeToolName(toolName: string): string {
 	return toolName === 'bash' ? 'shell' : toolName;
@@ -93,29 +47,24 @@ export function mergeProviderOptions(
 	return base;
 }
 
+/**
+ * Normalizes the edit tool set for build agents. Every model family receives
+ * the same editing tools; provider/model/config are accepted for API
+ * compatibility only.
+ */
 export function applyModelFamilyEditToolPolicy(
 	agent: string,
 	tools: string[],
-	provider: RunOpts['provider'],
-	model: string,
-	cfg?: OttoConfig,
+	_provider?: RunOpts['provider'],
+	_model?: string,
+	_cfg?: OttoConfig,
 ): string[] {
-	tools = normalizeToolNames(tools);
-	if (!MODEL_FAMILY_EDIT_TOOL_POLICY_AGENTS.has(agent)) return tools;
-
-	const modelInfo = findConfiguredModelInfo(cfg, provider, model);
-	const next = tools.filter(
+	const normalized = normalizeToolNames(tools);
+	if (!MODEL_FAMILY_EDIT_TOOL_POLICY_AGENTS.has(agent)) return normalized;
+	const next = normalized.filter(
 		(toolName) => !EDITING_TOOL_NAMES.includes(toolName),
 	);
-	if (shouldUseStructuredEditTools(model, modelInfo)) {
-		return Array.from(
-			new Set([...next, 'apply_patch', 'write', 'edit', 'multiedit']),
-		);
-	}
-
-	const preferredEditingTools = ['apply_patch', 'write', 'edit', 'multiedit'];
-
-	return Array.from(new Set([...next, ...preferredEditingTools]));
+	return Array.from(new Set([...next, ...PREFERRED_EDITING_TOOLS]));
 }
 
 export function buildAllowedTools(args: {
@@ -126,14 +75,9 @@ export function buildAllowedTools(args: {
 	cfg: OttoConfig;
 	allTools: DiscoveredTool[];
 }): DiscoveredTool[] {
-	const allowedToolNames = applyModelFamilyEditToolPolicy(
-		args.agentName,
-		args.agentTools,
-		args.provider,
-		args.model,
-		args.cfg,
+	const allowedNames = new Set(
+		applyModelFamilyEditToolPolicy(args.agentName, args.agentTools),
 	);
-	const allowedNames = new Set(normalizeToolNames(allowedToolNames));
 	return args.allTools.filter(
 		(tool) =>
 			allowedNames.has(tool.name) ||

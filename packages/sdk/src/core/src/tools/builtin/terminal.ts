@@ -21,6 +21,24 @@ function formatShellCommand(parts: string[]): string {
 	return parts.map(shellQuote).join(' ');
 }
 
+/** Executable text for guards; start includes args, write includes the complete stdin input. */
+export function getTerminalExecutableInput(params: {
+	operation: string;
+	command?: string;
+	args?: string[];
+	shell?: boolean;
+	input?: string;
+}): string | undefined {
+	if (params.operation === 'write') return params.input;
+	if (params.operation !== 'start') return undefined;
+	if (params.shell !== false && params.command && !params.args?.length)
+		return params.command;
+	const parts = [params.command, ...(params.args ?? [])].filter(
+		(part): part is string => part !== undefined,
+	);
+	return parts.length ? formatShellCommand(parts) : undefined;
+}
+
 function normalizePath(p: string) {
 	const normalized = p.replace(/\\/g, '/');
 	const driveMatch = normalized.match(/^([A-Za-z]):\//);
@@ -143,23 +161,7 @@ export function buildTerminalTool(
 									: process.platform === 'darwin'
 										? ['-il']
 										: ['-i'];
-							const providedCommand = params.command;
-							const providedArgs = params.args ?? [];
-
-							if (providedCommand || providedArgs.length > 0) {
-								if (providedArgs.length === 0 && providedCommand) {
-									// Command already contains spaces; treat as full shell snippet
-									initialCommand = providedCommand;
-								} else {
-									const commandParts = [
-										providedCommand,
-										...providedArgs,
-									].filter((part): part is string => Boolean(part));
-									if (commandParts.length > 0) {
-										initialCommand = formatShellCommand(commandParts);
-									}
-								}
-							}
+							initialCommand = getTerminalExecutableInput(params) ?? null;
 						}
 
 						const term = terminalManager.create({
@@ -172,11 +174,14 @@ export function buildTerminalTool(
 						});
 
 						if (initialCommand) {
-							queueMicrotask(() => {
+							try {
 								term.write(
 									`${injectCoAuthorIntoGitCommit(initialCommand, coAuthorCommits)}\n`,
 								);
-							});
+							} catch (error) {
+								terminalManager.delete(term.id);
+								throw error;
+							}
 						}
 
 						return {

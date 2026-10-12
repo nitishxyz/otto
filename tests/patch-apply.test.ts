@@ -1759,7 +1759,7 @@ describe('patch apply — fuzzy match false positive prevention', () => {
 		);
 	});
 
-	it('still applies when removal lines are missing but context matches', async () => {
+	it('rejects missing removal lines even when context matches', async () => {
 		await writeTestFile(
 			'partial.ts',
 			['function process() {', '  const b = 2;', '  return b;', '}'].join('\n'),
@@ -1776,12 +1776,12 @@ describe('patch apply — fuzzy match false positive prevention', () => {
 			'*** End Patch',
 		].join('\n');
 
-		await applyPatch(patch);
+		await expect(applyPatch(patch)).rejects.toThrow(
+			'Failed to apply patch hunk',
+		);
 		const content = await readTestFile('partial.ts');
 		expect(content.trim()).toBe(
-			['function process() {', '  const b = 20;', '  return b;', '}'].join(
-				'\n',
-			),
+			['function process() {', '  const b = 2;', '  return b;', '}'].join('\n'),
 		);
 	});
 
@@ -2265,7 +2265,7 @@ describe('patch apply — Replace mode robustness', () => {
 		expect(content).not.toContain('  const port');
 	});
 
-	it('applies Replace when Find has stale middle line (anchored range fallback)', async () => {
+	it('rejects Replace when Find has a stale middle line', async () => {
 		await writeTestFile(
 			'stale.ts',
 			[
@@ -2289,10 +2289,12 @@ describe('patch apply — Replace mode robustness', () => {
 			'*** End Patch',
 		].join('\n');
 
-		await applyPatch(patch);
+		await expect(applyPatch(patch)).rejects.toThrow(
+			'Failed to apply patch hunk',
+		);
 		const content = await readTestFile('stale.ts');
-		expect(content).toContain('const port = 8080;');
-		expect(content).toContain('const debug = true;');
+		expect(content).toContain('const port = 3000;');
+		expect(content).toContain('const debug = false;');
 	});
 
 	it('rejects Replace when too few Find lines match (<50%)', async () => {

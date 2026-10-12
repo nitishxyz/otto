@@ -1,17 +1,18 @@
 import { isProviderStreamIdleTimeoutError, logger } from '@ottocode/sdk';
 import type { getDb } from '@ottocode/database';
-import { messages } from '@ottocode/database/schema';
-import { eq } from 'drizzle-orm';
 import { publish } from '../../../events/bus.ts';
 import type { RunOpts } from '../../session/queue.ts';
-import { enqueueAssistantRun } from '../../session/queue.ts';
 import { cleanupEmptyTextParts } from '../../session/db-operations.ts';
 import { toErrorMessage } from '../../errors/handling.ts';
+import {
+	claimPendingMessage,
+	isRunCancelled,
+	scheduleContinuation,
+} from '../turn/continuation.ts';
+import type { RunSessionLoop } from '../turn/types.ts';
 
 const PROVIDER_STREAM_IDLE_RETRY_MAX = 2;
 const MAX_OUTPUT_CONTINUATION_RETRY_MAX = 2;
-
-type RunSessionLoop = (sessionId: string) => Promise<void>;
 
 function parsePositiveIntegerEnv(name: string, fallback: number) {
 	const raw = process.env[name];
@@ -37,7 +38,7 @@ function getMaxOutputContinuationRetryMax() {
 	);
 }
 
-function isMaxOutputTokensFinish(
+export function isMaxOutputTokensFinish(
 	finishReason: string | undefined,
 	rawFinishReason: string | undefined,
 ): boolean {
@@ -52,13 +53,25 @@ function isMaxOutputTokensFinish(
 	);
 }
 
-function isProviderOrLegacyCodexStreamIdleTimeout(error: unknown): boolean {
+export function isProviderOrLegacyCodexStreamIdleTimeout(
+	error: unknown,
+): boolean {
 	if (isProviderStreamIdleTimeoutError(error)) return true;
 	const message = toErrorMessage(error);
 	return (
 		message.includes('OpenAI OAuth Codex stream idle timeout') ||
 		message.includes('OpenAI OAuth Codex WebSocket')
 	);
+}
+
+/** Whether a stream idle timeout should be retried for this run. */
+export function shouldRetryProviderStreamIdleTimeout(
+	err: unknown,
+	opts: RunOpts,
+): boolean {
+	if (!isProviderOrLegacyCodexStreamIdleTimeout(err)) return false;
+	if (isRunCancelled(opts)) return false;
+	return (opts.streamIdleRetryCount ?? 0) < getProviderStreamIdleRetryMax();
 }
 
 export async function retryAfterProviderStreamIdleTimeout(args: {
@@ -68,26 +81,21 @@ export async function retryAfterProviderStreamIdleTimeout(args: {
 	runSessionLoop: RunSessionLoop;
 }): Promise<boolean> {
 	const { err, opts, db, runSessionLoop } = args;
-	if (!isProviderOrLegacyCodexStreamIdleTimeout(err)) return false;
-	if (opts.abortSignal?.aborted) return false;
+	if (!shouldRetryProviderStreamIdleTimeout(err, opts)) return false;
 
 	const streamIdleRetryCount = opts.streamIdleRetryCount ?? 0;
-	const maxRetries = getProviderStreamIdleRetryMax();
-	if (streamIdleRetryCount >= maxRetries) return false;
-
-	const retryMessageId = crypto.randomUUID();
 	await cleanupEmptyTextParts(opts, db);
-	await db
-		.update(messages)
-		.set({
-			status: 'complete',
-			completedAt: Date.now(),
-			finishReason: 'stream-idle-retry',
-		})
-		.where(eq(messages.id, opts.assistantMessageId));
+	const claimed = await claimPendingMessage(db, opts.assistantMessageId, {
+		status: 'complete',
+		completedAt: Date.now(),
+		finishReason: 'stream-idle-retry',
+	});
+	if (!claimed) return true;
 	publish({
 		type: 'message.completed',
 		sessionId: opts.sessionId,
+		projectId: opts.projectId,
+		projectRoot: opts.projectRoot,
 		payload: {
 			id: opts.assistantMessageId,
 			finishReason: 'stream-idle-retry',
@@ -95,38 +103,14 @@ export async function retryAfterProviderStreamIdleTimeout(args: {
 		},
 	});
 
-	await db.insert(messages).values({
-		id: retryMessageId,
-		sessionId: opts.sessionId,
-		role: 'assistant',
-		status: 'pending',
-		agent: opts.agent,
-		provider: opts.provider,
-		model: opts.model,
-		createdAt: Date.now(),
-	});
-	publish({
-		type: 'message.created',
-		sessionId: opts.sessionId,
-		payload: {
-			id: retryMessageId,
-			role: 'assistant',
-			agent: opts.agent,
-			provider: opts.provider,
-			model: opts.model,
-			providerStreamRetry: true,
-		},
-	});
-
-	const { abortSignal: _abortSignal, queuedAt: _queuedAt, ...retryOpts } = opts;
-	enqueueAssistantRun(
-		{
-			...retryOpts,
-			assistantMessageId: retryMessageId,
-			streamIdleRetryCount: streamIdleRetryCount + 1,
-		},
+	const retryMessageId = await scheduleContinuation({
+		db,
+		opts,
+		kind: 'stream-idle-retry',
+		counters: { streamIdleRetryCount: streamIdleRetryCount + 1 },
 		runSessionLoop,
-	);
+		createdPayload: { providerStreamRetry: true },
+	});
 	logger.warn('[agent] retrying provider run after stream idle timeout', {
 		sessionId: opts.sessionId,
 		messageId: opts.assistantMessageId,
@@ -135,12 +119,30 @@ export async function retryAfterProviderStreamIdleTimeout(args: {
 		provider: opts.provider,
 		model: opts.model,
 		attempt: streamIdleRetryCount + 1,
-		maxRetries,
+		maxRetries: getProviderStreamIdleRetryMax(),
 		error: toErrorMessage(err),
 	});
 	return true;
 }
 
+/** Whether a max-output-tokens finish should be continued in a new run. */
+export function shouldContinueAfterMaxOutputTokens(args: {
+	opts: RunOpts;
+	finishReason: string | undefined;
+	rawFinishReason: string | undefined;
+}): boolean {
+	const { opts } = args;
+	if (!isMaxOutputTokensFinish(args.finishReason, args.rawFinishReason))
+		return false;
+	if (isRunCancelled(opts)) return false;
+	if (opts.isCompactCommand) return false;
+	return (opts.continuationCount ?? 0) < getMaxOutputContinuationRetryMax();
+}
+
+/**
+ * Schedules a continuation after a max-output-tokens finish. The caller owns
+ * completing the original message.
+ */
 export async function retryAfterMaxOutputTokensFinish(args: {
 	opts: RunOpts;
 	db: Awaited<ReturnType<typeof getDb>>;
@@ -149,48 +151,19 @@ export async function retryAfterMaxOutputTokensFinish(args: {
 	runSessionLoop: RunSessionLoop;
 }): Promise<boolean> {
 	const { opts, db, finishReason, rawFinishReason, runSessionLoop } = args;
-	if (!isMaxOutputTokensFinish(finishReason, rawFinishReason)) return false;
-	if (opts.abortSignal?.aborted) return false;
-	if (opts.isCompactCommand) return false;
+	if (!shouldContinueAfterMaxOutputTokens(args)) return false;
 
 	const continuationCount = opts.continuationCount ?? 0;
-	const maxRetries = getMaxOutputContinuationRetryMax();
-	if (continuationCount >= maxRetries) return false;
-
-	const retryMessageId = crypto.randomUUID();
-	await db.insert(messages).values({
-		id: retryMessageId,
-		sessionId: opts.sessionId,
-		role: 'assistant',
-		status: 'pending',
-		agent: opts.agent,
-		provider: opts.provider,
-		model: opts.model,
-		createdAt: Date.now(),
-	});
-	publish({
-		type: 'message.created',
-		sessionId: opts.sessionId,
-		payload: {
-			id: retryMessageId,
-			role: 'assistant',
-			agent: opts.agent,
-			provider: opts.provider,
-			model: opts.model,
-			maxOutputContinuation: true,
-		},
-	});
-
-	const { abortSignal: _abortSignal, queuedAt: _queuedAt, ...retryOpts } = opts;
-	enqueueAssistantRun(
-		{
-			...retryOpts,
-			assistantMessageId: retryMessageId,
-			continuationCount: continuationCount + 1,
-		},
+	const retryMessageId = await scheduleContinuation({
+		db,
+		opts,
+		kind: 'max-output',
+		counters: { continuationCount: continuationCount + 1 },
 		runSessionLoop,
-		{ front: true },
-	);
+		front: true,
+		createdPayload: { maxOutputContinuation: true },
+	});
+	if (!retryMessageId) return false;
 	logger.warn('[agent] continuing run after max output token finish', {
 		sessionId: opts.sessionId,
 		messageId: opts.assistantMessageId,
@@ -201,7 +174,7 @@ export async function retryAfterMaxOutputTokensFinish(args: {
 		finishReason,
 		rawFinishReason,
 		attempt: continuationCount + 1,
-		maxRetries,
+		maxRetries: getMaxOutputContinuationRetryMax(),
 	});
 	return true;
 }

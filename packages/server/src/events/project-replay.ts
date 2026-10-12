@@ -84,6 +84,7 @@ function createRecord(
 			chunk: encodeSSEEvent(
 				sessionEvent.type,
 				{
+					type: sessionEvent.type,
 					sessionId: sessionEvent.sessionId,
 					projectId: sessionEvent.projectId,
 					projectRoot: sessionEvent.projectRoot,
@@ -108,6 +109,7 @@ function createRecord(
 		chunk: encodeSSEEvent(
 			clientEvent.type,
 			{
+				type: clientEvent.type,
 				projectId: payload.projectId,
 				projectRoot: payload.projectRoot,
 				payload: clientEvent.payload ?? {},

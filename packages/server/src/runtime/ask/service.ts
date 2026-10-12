@@ -1,11 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { loadConfig } from '@ottocode/sdk';
 import { getDb } from '@ottocode/database';
-import {
-	createSession,
-	getLastSession,
-	getSessionById,
-} from '../session/manager.ts';
+import { getLastSession, getSessionById } from '../session/manager.ts';
 import {
 	selectProviderAndModel,
 	type ProviderSelection,
@@ -15,14 +11,17 @@ import { dispatchAssistantMessage } from '../message/service.ts';
 import {
 	validateProviderModel,
 	isProviderAuthorized,
-	ensureProviderEnv,
 	hasConfiguredProvider,
-	providerEnvVar,
 	type ProviderId,
 	type ReasoningLevel,
 } from '@ottocode/sdk';
 import { sessions } from '@ottocode/database/schema';
 import { time } from '../debug/index.ts';
+import {
+	getRequestApiKey,
+	withRequestCredentials,
+} from '../provider/credentials.ts';
+import { createAskSession } from './session.ts';
 
 export class AskServiceError extends Error {
 	constructor(
@@ -99,7 +98,24 @@ export async function handleAskRequest(
 	request: AskServerRequest,
 ): Promise<AskServerResponse> {
 	try {
-		return await processAskRequest(request);
+		const provider = request.config?.provider ?? request.provider ?? 'openai';
+		const credentials =
+			request.credentials ??
+			(request.config?.apiKey !== undefined
+				? { [provider]: { apiKey: request.config.apiKey } }
+				: {});
+		for (const [id, entry] of Object.entries(credentials)) {
+			if (entry && !entry.apiKey.trim())
+				throw new AskServiceError(`Missing credentials for ${id}`, 401);
+			if (entry && (id === 'copilot' || id === 'ottorouter'))
+				throw new AskServiceError(
+					`Request API keys are not supported for ${id}; use its OAuth authentication.`,
+					400,
+				);
+		}
+		return await withRequestCredentials(credentials, () =>
+			processAskRequest(request),
+		);
 	} catch (err) {
 		throw normalizeAskServiceError(err);
 	}
@@ -153,21 +169,6 @@ async function processAskRequest(
 				minimax: { enabled: true },
 			},
 		};
-
-		if (request.credentials) {
-			for (const [provider, creds] of Object.entries(request.credentials)) {
-				if (!creds) continue;
-				const envKey =
-					providerEnvVar(provider as ProviderId) ??
-					`${provider.toUpperCase()}_API_KEY`;
-				process.env[envKey] = creds.apiKey;
-			}
-		} else if (request.config?.apiKey) {
-			const envKey =
-				providerEnvVar(injectedProvider) ??
-				`${injectedProvider.toUpperCase()}_API_KEY`;
-			process.env[envKey] = request.config.apiKey;
-		}
 	} else {
 		cfg = await loadConfig(projectRoot);
 	}
@@ -247,13 +248,13 @@ async function processAskRequest(
 
 	if (!session) {
 		const createTimer = time('ask:createSession');
-		const newSession = await createSession({
+		const newSession = await createAskSession({
 			db,
 			cfg,
 			agent: agentName,
 			provider: providerSelection.provider,
 			model: providerSelection.model,
-			title: null,
+			allowUnknownModel: request.allowUnknownModel,
 		});
 		createTimer.end();
 		session = newSession;
@@ -281,10 +282,9 @@ async function processAskRequest(
 		modelForMessage = providerSelection.model;
 	}
 
-	const providerAuthorized = await isProviderAuthorized(
-		cfg,
-		providerForMessage,
-	);
+	const providerAuthorized =
+		getRequestApiKey(providerForMessage) !== undefined ||
+		(await isProviderAuthorized(cfg, providerForMessage));
 	let fellBackToSelection = false;
 	if (!providerAuthorized) {
 		providerForMessage = providerSelection.provider;
@@ -312,10 +312,6 @@ async function processAskRequest(
 		wantsVision: Boolean(request.images?.length),
 		allowUnknownModel: request.allowUnknownModel === true,
 	});
-
-	if (!request.skipFileConfig && !request.config && !request.credentials) {
-		await ensureProviderEnv(cfg, providerForMessage);
-	}
 
 	const reasoningText =
 		request.reasoningText ?? cfg.defaults.reasoningText ?? false;

@@ -1,6 +1,7 @@
 import type { getDb } from '@ottocode/database';
 import { messages } from '@ottocode/database/schema';
 import { eq } from 'drizzle-orm';
+import { logger } from '@ottocode/sdk';
 import { publish } from '../../events/bus.ts';
 import type { RunOpts } from '../session/queue.ts';
 import { performAutoCompaction } from './compaction-auto.ts';
@@ -43,14 +44,15 @@ export async function runAutoCompactionFlow(args: {
 	});
 
 	let succeeded = false;
+	const publishWrapper = (event: {
+		type: string;
+		sessionId: string;
+		payload: Record<string, unknown>;
+	}) => {
+		publish(event as Parameters<typeof publish>[0]);
+	};
+	let compactError: string | undefined;
 	try {
-		const publishWrapper = (event: {
-			type: string;
-			sessionId: string;
-			payload: Record<string, unknown>;
-		}) => {
-			publish(event as Parameters<typeof publish>[0]);
-		};
 		const compactResult = await performAutoCompaction(
 			db,
 			opts.sessionId,
@@ -61,17 +63,25 @@ export async function runAutoCompactionFlow(args: {
 			opts.projectRoot,
 			args.throughMessageId,
 		);
-		if (compactResult.success) {
-			succeeded = true;
-		} else {
-			const pruneResult = await pruneSession(db, opts.sessionId);
-			succeeded = pruneResult.pruned > 0;
-		}
-	} catch {
+		succeeded = compactResult.success;
+		compactError = compactResult.error;
+	} catch (error) {
+		compactError = error instanceof Error ? error.message : String(error);
+	}
+	if (!succeeded) {
+		logger.warn('[compaction] summary not installed; pruning instead', {
+			sessionId: opts.sessionId,
+			error: compactError,
+		});
 		try {
 			const pruneResult = await pruneSession(db, opts.sessionId);
 			succeeded = pruneResult.pruned > 0;
-		} catch {}
+		} catch (error) {
+			logger.error('[compaction] pruning failed to persist', {
+				sessionId: opts.sessionId,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
 	}
 
 	await db

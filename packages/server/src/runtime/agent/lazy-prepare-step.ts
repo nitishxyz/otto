@@ -1,4 +1,5 @@
 import type { Tool } from 'ai';
+import { logger } from '@ottocode/sdk';
 import type { getDb } from '@ottocode/database';
 import { messageParts, messages } from '@ottocode/database/schema';
 import { and, eq } from 'drizzle-orm';
@@ -13,7 +14,53 @@ export interface LazyToolLoaderState {
 export interface LazyPrepareStepState {
 	baseToolNames: string[];
 	loaders: LazyToolLoaderState[];
+	/** Receives only steps not yet seen by previous prepareStep calls. */
 	refresh?: (args: { steps: unknown[] }) => void | Promise<void>;
+	consumedSteps: number;
+}
+
+type StepToolCall = { toolCallId?: string; toolName: string; input?: unknown };
+type StepToolResult = {
+	toolCallId?: string;
+	toolName: string;
+	output: unknown;
+};
+type PreparedStep = {
+	toolCalls?: StepToolCall[];
+	toolResults?: StepToolResult[];
+};
+
+/**
+ * Finds the result for a specific call. Results are matched by `toolCallId`;
+ * name matching is only used when the provider omitted call ids entirely.
+ */
+export function findToolResultForCall(
+	call: StepToolCall,
+	results: StepToolResult[],
+): StepToolResult | undefined {
+	if (call.toolCallId) {
+		return results.find((result) => result.toolCallId === call.toolCallId);
+	}
+	return results.find(
+		(result) => !result.toolCallId && result.toolName === call.toolName,
+	);
+}
+
+function applyLoadedTools(state: LazyPrepareStepState, steps: unknown[]): void {
+	for (const step of steps as PreparedStep[]) {
+		if (!step?.toolCalls) continue;
+		for (const call of step.toolCalls) {
+			for (const loader of state.loaders) {
+				if (call.toolName !== loader.loadToolRegistrationName) continue;
+				const result = findToolResultForCall(call, step.toolResults ?? []);
+				const loaded = parseLoadedToolsOutput(result?.output);
+				for (const canonicalName of loaded) {
+					const registered = loader.canonicalToRegistration[canonicalName];
+					if (registered !== undefined) loader.loadedTools.add(registered);
+				}
+			}
+		}
+	}
 }
 
 export function createLazyToolLoaderState(
@@ -24,7 +71,8 @@ export function createLazyToolLoaderState(
 ): LazyToolLoaderState {
 	const loadedTools = new Set<string>();
 	for (const canonicalName of initialLoadedTools) {
-		loadedTools.add(canonicalToRegistration[canonicalName] ?? canonicalName);
+		const registered = canonicalToRegistration[canonicalName];
+		if (registered !== undefined) loadedTools.add(registered);
 	}
 
 	return {
@@ -143,56 +191,36 @@ export function createLazyPrepareStepState(
 	return {
 		baseToolNames,
 		loaders,
+		consumedSteps: 0,
 		...(refresh ? { refresh } : {}),
 	};
 }
 
 export function buildLazyPrepareStep(state: LazyPrepareStepState) {
-	return async ({
-		stepNumber,
-		steps,
-	}: {
-		stepNumber: number;
-		steps: unknown[];
-	}) => {
-		const previousSteps = steps as Array<{
-			toolCalls?: Array<{ toolName: string; input: unknown }>;
-			toolResults?: Array<{ toolName: string; output: unknown }>;
-		}>;
+	return async ({ steps }: { stepNumber: number; steps: unknown[] }) => {
+		const start = Math.min(state.consumedSteps, steps.length);
+		const newSteps = steps.slice(start);
+		state.consumedSteps = steps.length;
 
 		if (state.refresh) {
 			try {
-				await state.refresh({ steps });
-			} catch {}
-		}
-
-		for (const step of previousSteps) {
-			if (!step.toolCalls) continue;
-			for (const call of step.toolCalls) {
-				for (const loader of state.loaders) {
-					if (call.toolName !== loader.loadToolRegistrationName) continue;
-					const result = (step.toolResults ?? []).find(
-						(r) => r.toolName === loader.loadToolRegistrationName,
-					);
-					const output = result?.output as { loaded?: string[] } | undefined;
-					if (!output?.loaded) continue;
-					for (const canonicalName of output.loaded) {
-						const regName =
-							loader.canonicalToRegistration[canonicalName] ?? canonicalName;
-						if (!loader.loadedTools.has(regName)) {
-							loader.loadedTools.add(regName);
-						}
-					}
-				}
+				await state.refresh({ steps: newSteps });
+			} catch (error) {
+				logger.warn('[tools] lazy tool refresh failed', {
+					error: error instanceof Error ? error.message : String(error),
+				});
 			}
 		}
+
+		applyLoadedTools(state, newSteps);
 
 		const loadedTools = state.loaders.flatMap((loader) => [
 			...loader.loadedTools,
 		]);
-		const activeTools = [...state.baseToolNames, ...loadedTools];
-		void stepNumber;
-
-		return { activeTools };
+		return {
+			activeTools: Array.from(
+				new Set([...state.baseToolNames, ...loadedTools]),
+			),
+		};
 	};
 }

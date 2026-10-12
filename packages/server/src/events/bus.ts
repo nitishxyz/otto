@@ -103,6 +103,7 @@ export function publishNotification(payload: NotificationEvent) {
 	publishClientEvent({ type: 'notification', payload });
 }
 
+/** @deprecated Internal callers should use subscribeScopedSessionEvents. */
 export function subscribe(
 	sessionId: string,
 	handler: Subscriber,
@@ -119,6 +120,25 @@ export function subscribe(
 		set?.delete(handler);
 		if (set && set.size === 0) subscribers.delete(key);
 	};
+}
+
+/** Requires an explicit project scope for internal session observers. */
+export function subscribeScopedSessionEvents(
+	sessionId: string,
+	handler: Subscriber,
+	projectKey: string,
+) {
+	return subscribe(sessionId, handler, projectKey);
+}
+
+/** Explicit daemon-wide subscription, including every project with this session id. */
+export function subscribeGlobalSessionEvents(
+	sessionId: string,
+	handler: Subscriber,
+) {
+	return subscribeDesktopEvents((event, replay) => {
+		if (event.sessionId === sessionId) handler(event, replay);
+	});
 }
 
 export function subscribeClientEvents(handler: ClientSubscriber) {

@@ -8,6 +8,7 @@ import type {
 	SendNowPreemptReason,
 	SendQueuedMessageNowResult,
 } from './types.ts';
+import type { ProcessQueueFn } from './enqueue.ts';
 import {
 	abortAndDeleteMessageController,
 	getRunnerStateInternal,
@@ -22,11 +23,12 @@ export function abortSession(
 	sessionId: string,
 	clearQueue = false,
 	reason?: RunAbortReason,
+	projectRoot?: string,
 ): void {
-	const state = getRunnerStateInternal(sessionId);
+	const state = getRunnerStateInternal(sessionId, projectRoot);
 	if (!state) {
-		abortActiveShellsForSession(sessionId);
-		clearPendingApprovalsForSession(sessionId);
+		abortActiveShellsForSession(sessionId, projectRoot);
+		clearPendingApprovalsForSession(sessionId, projectRoot);
 		return;
 	}
 
@@ -55,7 +57,7 @@ export function abortSession(
 			);
 		}
 		state.queue = [];
-		publishQueueState(sessionId);
+		publishQueueState(sessionId, state.projectRoot);
 	}
 }
 
@@ -67,10 +69,15 @@ export function abortSession(
 export function abortMessage(
 	sessionId: string,
 	messageId: string,
+	projectRoot?: string,
 ): { removed: boolean; wasRunning: boolean } {
-	const state = getRunnerStateInternal(sessionId);
+	const state = getRunnerStateInternal(sessionId, projectRoot);
 	if (!state) {
-		const abortedShells = abortActiveShellsForMessage(sessionId, messageId);
+		const abortedShells = abortActiveShellsForMessage(
+			sessionId,
+			messageId,
+			projectRoot,
+		);
 		return { removed: abortedShells > 0, wasRunning: abortedShells > 0 };
 	}
 
@@ -89,7 +96,7 @@ export function abortMessage(
 	if (index !== -1) {
 		const [removed] = state.queue.splice(index, 1);
 		abortAndDeleteMessageController(messageId, undefined, removed.projectRoot);
-		publishQueueState(sessionId);
+		publishQueueState(sessionId, state.projectRoot);
 		return { removed: true, wasRunning: false };
 	}
 
@@ -104,8 +111,12 @@ export function abortMessage(
 /**
  * Removes a queued message (not the currently running one).
  */
-export function removeFromQueue(sessionId: string, messageId: string): boolean {
-	const state = getRunnerStateInternal(sessionId);
+export function removeFromQueue(
+	sessionId: string,
+	messageId: string,
+	projectRoot?: string,
+): boolean {
+	const state = getRunnerStateInternal(sessionId, projectRoot);
 	if (!state) return false;
 
 	// Don't allow removing the currently running message via this function.
@@ -121,7 +132,7 @@ export function removeFromQueue(sessionId: string, messageId: string): boolean {
 	const [removed] = state.queue.splice(index, 1);
 	abortAndDeleteMessageController(messageId, undefined, removed.projectRoot);
 
-	publishQueueState(sessionId);
+	publishQueueState(sessionId, state.projectRoot);
 	return true;
 }
 
@@ -131,9 +142,10 @@ export function removeFromQueue(sessionId: string, messageId: string): boolean {
 export function sendQueuedMessageNow(
 	sessionId: string,
 	messageId: string,
-	processQueueFn: (sessionId: string) => Promise<void>,
+	processQueueFn: ProcessQueueFn,
+	projectRoot?: string,
 ): SendQueuedMessageNowResult {
-	const state = getRunnerStateInternal(sessionId);
+	const state = getRunnerStateInternal(sessionId, projectRoot);
 	if (!state) return { success: false };
 
 	if (state.currentMessageId === messageId) {
@@ -169,10 +181,10 @@ export function sendQueuedMessageNow(
 		clearPendingApprovalsForSession(sessionId, state.projectRoot);
 	}
 
-	publishQueueState(sessionId);
+	publishQueueState(sessionId, state.projectRoot);
 
 	if (!state.running) {
-		void processQueueFn(sessionId);
+		void processQueueFn(sessionId, state.projectRoot);
 	}
 
 	return {

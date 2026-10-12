@@ -8,6 +8,7 @@ import type { ProviderId } from '../../types/src/index.ts';
 
 export type OpencodeProviderConfig = {
 	apiKey?: string;
+	baseURL?: string;
 	promptCacheKey?: string;
 	fetch?: typeof fetch;
 };
@@ -42,6 +43,7 @@ export function createOpencodeModel(
 	const binding = modelInfo?.provider?.npm ?? entry?.npm;
 	const apiKey = config?.apiKey ?? process.env.OPENCODE_API_KEY ?? '';
 	const baseURL =
+		config?.baseURL ||
 		modelInfo?.provider?.baseURL ||
 		modelInfo?.provider?.api ||
 		entry?.api ||
@@ -75,6 +77,7 @@ export function createOpencodeModel(
 		name: entry?.label ?? 'opencode',
 		baseURL,
 		headers,
+		fetch: cachingFetch,
 	});
 	return defaultInstance(resolvedModelId);
 }

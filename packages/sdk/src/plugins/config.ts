@@ -1,8 +1,8 @@
 import {
-	ensureDir,
 	getGlobalPluginsConfigPath,
 	getProjectPluginsConfigPath,
 } from '../config/src/paths.ts';
+import { atomicWriteText, serializeByKey } from './fs-safety.ts';
 import { pluginsConfigSchema } from './schema.ts';
 import type { PluginsConfig, PluginScope } from './schema.ts';
 
@@ -24,9 +24,32 @@ export async function writePluginsConfig(
 	projectRoot?: string,
 ): Promise<void> {
 	const configPath = getPluginsConfigPath(scope, projectRoot);
-	await ensureDir(configPath.slice(0, configPath.lastIndexOf('/')));
 	const normalized = pluginsConfigSchema.parse(config);
-	await Bun.write(configPath, `${JSON.stringify(normalized, null, 2)}\n`);
+	await serializeByKey(configPath, () =>
+		atomicWriteText(configPath, `${JSON.stringify(normalized, null, 2)}\n`),
+	);
+}
+
+/**
+ * Serialized read-modify-write of a scope's plugins.json. Concurrent callers on
+ * the same file never lose each other's updates.
+ */
+export async function updatePluginsConfig(
+	scope: PluginScope,
+	projectRoot: string | undefined,
+	mutate: (config: PluginsConfig) => void | Promise<void>,
+): Promise<PluginsConfig> {
+	const configPath = getPluginsConfigPath(scope, projectRoot);
+	return serializeByKey(configPath, async () => {
+		const config = await loadPluginsConfig(scope, projectRoot);
+		await mutate(config);
+		const normalized = pluginsConfigSchema.parse(config);
+		await atomicWriteText(
+			configPath,
+			`${JSON.stringify(normalized, null, 2)}\n`,
+		);
+		return normalized;
+	});
 }
 
 export function getPluginsConfigPath(

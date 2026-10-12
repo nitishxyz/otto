@@ -76,6 +76,7 @@ export type OpenAIOAuthConfig = {
 	sessionId?: string;
 	transport?: OpenAIOAuthTransport;
 	webSocketFactory?: OpenAIOAuthWebSocketFactory;
+	fetch?: typeof fetch;
 };
 
 function shouldDebugOpenAIOAuth() {
@@ -501,13 +502,14 @@ async function fetchWithCodexRequestTimeout(
 	init: RequestInit,
 	args: {
 		enabled: boolean;
+		fetch?: typeof fetch;
 		sessionId?: string;
 		model?: string;
 		requestStartedAt: number;
 	},
 ) {
 	if (!args.enabled) {
-		return fetch(url, {
+		return (args.fetch ?? fetch)(url, {
 			...init,
 			timeout: false,
 		});
@@ -562,6 +564,7 @@ async function fetchCodexRequestAttemptWithTimeout(
 	url: string,
 	init: RequestInit,
 	args: {
+		fetch?: typeof fetch;
 		sessionId?: string;
 		model?: string;
 		requestStartedAt: number;
@@ -591,7 +594,7 @@ async function fetchCodexRequestAttemptWithTimeout(
 	}
 
 	try {
-		return await fetch(url, {
+		return await (args.fetch ?? fetch)(url, {
 			...init,
 			signal: controller.signal,
 			timeout: false,
@@ -768,6 +771,7 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 						{ ...requestInit, headers },
 						{
 							enabled: true,
+							fetch: config.fetch,
 							sessionId: config.sessionId,
 							model: requestModel,
 							requestStartedAt,
@@ -780,6 +784,7 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 					{ ...requestInit, headers },
 					{
 						enabled: isResponsesRequest,
+						fetch: config.fetch,
 						sessionId: config.sessionId,
 						model: requestModel,
 						requestStartedAt,
@@ -864,6 +869,7 @@ export function createOpenAIOAuthFetch(config: OpenAIOAuthConfig) {
 						sessionId: config.sessionId,
 						model: requestModel,
 						requestStartedAt: retryStartedAt,
+						fetch: config.fetch,
 					},
 				);
 				loggerDebug('[openai-oauth] retry response received', {

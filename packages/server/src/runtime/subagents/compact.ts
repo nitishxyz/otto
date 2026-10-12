@@ -71,6 +71,7 @@ export async function compactSubagent(args: {
 			record.childSessionId,
 			assistantMessageId,
 			runSessionLoop,
+			args.cfg.projectRoot,
 		);
 		if (sendNowResult.success) {
 			preemptedMessageId = sendNowResult.preemptedMessageId;

@@ -1,12 +1,14 @@
+import {
+	asPrepareStepResult,
+	currentStepMessages,
+	type PrepareStepArgs as StageArgs,
+} from '../turn/prepare-step.ts';
+
 const REMINDER_STEP_INTERVAL = 6;
 
 const OPEN_STATUSES = new Set(['pending', 'in_progress']);
 
-type PrepareStepArgs = {
-	stepNumber: number;
-	steps: unknown[];
-	messages: unknown[];
-};
+type PrepareStepArgs = StageArgs<unknown>;
 
 function normalizeToolName(name: string): string {
 	return name.toLowerCase().replace(/[_-]/g, '');
@@ -98,17 +100,15 @@ export function withTodoReminderPrepareStep(
 		if (stepsSinceTodoUpdate(args.steps) < REMINDER_STEP_INTERVAL) {
 			return innerResult;
 		}
-		const open = findOpenTodosInMessages(args.messages);
+		const previous = asPrepareStepResult<unknown>(innerResult);
+		const messages = currentStepMessages(args, previous);
+		const open = findOpenTodosInMessages(messages);
 		if (!open) return innerResult;
 		lastReminderStep = args.stepNumber;
-		const base =
-			innerResult && typeof innerResult === 'object'
-				? (innerResult as Record<string, unknown>)
-				: {};
 		return {
-			...base,
+			...(previous ?? {}),
 			messages: [
-				...args.messages,
+				...messages,
 				{ role: 'user', content: buildReminderText(open) },
 			],
 		};

@@ -5,6 +5,12 @@ import type {
 } from '@agentclientprotocol/sdk';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+	normalizePatchPath,
+	parsePatchFileDirective,
+	parseUnifiedFileHeader,
+	reversePatchForFile,
+} from './patch-reconstruction';
 
 const WRITE_TOOLS = ['write', 'edit', 'multiedit', 'copy_into', 'apply_patch'];
 
@@ -111,19 +117,31 @@ function buildFileDiffContents(
 
 	const fileChanges = getFileChanges(name, args, result, patch);
 	const contents: ToolCallContent[] = [];
+	const snapshots = Array.isArray(result.changes)
+		? (result.changes as Record<string, unknown>[])
+		: [];
 
 	for (const change of fileChanges) {
 		const absPath = path.isAbsolute(change.filePath)
 			? change.filePath
 			: path.join(cwd, change.filePath);
+		const snapshot =
+			snapshots.find((entry) => entry.filePath === change.filePath) ??
+			(result.artifact as Record<string, unknown> | undefined);
 		const newText =
-			change.kind === 'delete' ? '' : readTextFileIfExists(absPath);
+			typeof snapshot?.newText === 'string'
+				? snapshot.newText
+				: change.kind === 'delete'
+					? ''
+					: readTextFileIfExists(absPath);
 		if (newText === undefined) continue;
 
 		const oldText =
-			change.kind === 'add'
-				? null
-				: reversePatchForFile(patch, change.filePath, newText);
+			typeof snapshot?.oldText === 'string'
+				? snapshot.oldText
+				: change.kind === 'add'
+					? null
+					: reversePatchForFile(patch, change.filePath, newText);
 
 		contents.push({
 			type: 'diff',
@@ -176,107 +194,6 @@ function readTextFileIfExists(filePath: string): string | undefined {
 	} catch {
 		return undefined;
 	}
-}
-
-function reversePatchForFile(
-	patch: string,
-	filePath: string,
-	newText: string,
-): string | null {
-	const hunks = extractHunksForFile(patch, filePath);
-	if (hunks.length === 0) return null;
-
-	const oldLines = splitLines(newText);
-	for (const hunk of hunks.reverse()) {
-		const index = Math.max(0, hunk.newStart - 1);
-		oldLines.splice(index, hunk.newLines.length, ...hunk.oldLines);
-	}
-	return oldLines.join('\n');
-}
-
-function extractHunksForFile(
-	patch: string,
-	filePath: string,
-): Array<{ newStart: number; newLines: string[]; oldLines: string[] }> {
-	const normalizedPath = normalizePatchPath(filePath);
-	const hunks: Array<{
-		newStart: number;
-		newLines: string[];
-		oldLines: string[];
-	}> = [];
-	let inTargetFile = false;
-	let currentHunk:
-		| { newStart: number; newLines: string[]; oldLines: string[] }
-		| undefined;
-
-	for (const line of patch.split('\n')) {
-		const directivePath = parsePatchFileDirective(line);
-		if (directivePath) {
-			inTargetFile = normalizePatchPath(directivePath) === normalizedPath;
-			currentHunk = undefined;
-			continue;
-		}
-
-		const unifiedPath = parseUnifiedFileHeader(line);
-		if (unifiedPath) {
-			inTargetFile = normalizePatchPath(unifiedPath) === normalizedPath;
-			currentHunk = undefined;
-			continue;
-		}
-
-		if (!inTargetFile) continue;
-
-		const hunkMatch = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-		if (hunkMatch) {
-			currentHunk = {
-				newStart: Number(hunkMatch[2]),
-				newLines: [],
-				oldLines: [],
-			};
-			hunks.push(currentHunk);
-			continue;
-		}
-
-		if (!currentHunk) continue;
-		if (line.startsWith('+++ ') || line.startsWith('--- ')) continue;
-		if (line.startsWith('*** ')) {
-			currentHunk = undefined;
-			continue;
-		}
-
-		const prefix = line[0];
-		const value = line.slice(1);
-		if (prefix === ' ') {
-			currentHunk.oldLines.push(value);
-			currentHunk.newLines.push(value);
-		} else if (prefix === '-') {
-			currentHunk.oldLines.push(value);
-		} else if (prefix === '+') {
-			currentHunk.newLines.push(value);
-		}
-	}
-
-	return hunks;
-}
-
-function parsePatchFileDirective(line: string): string | undefined {
-	const match = line.match(/^\*\*\* (?:Update|Add|Delete) File: (.+)$/);
-	return match?.[1]?.trim();
-}
-
-function parseUnifiedFileHeader(line: string): string | undefined {
-	const match = line.match(/^(?:---|\+\+\+) (?:[ab]\/)?(.+)$/);
-	const filePath = match?.[1]?.trim();
-	if (!filePath || filePath === '/dev/null') return undefined;
-	return filePath;
-}
-
-function normalizePatchPath(filePath: string): string {
-	return filePath.replace(/\\/g, '/').replace(/^[ab]\//, '');
-}
-
-function splitLines(text: string): string[] {
-	return text.length > 0 ? text.split('\n') : [];
 }
 
 export function buildBashContent(

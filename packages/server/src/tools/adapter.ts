@@ -1,12 +1,17 @@
 import type { Tool } from 'ai';
-import type { DiscoveredTool } from '@ottocode/sdk';
+import {
+	logger,
+	getToolMetadata,
+	setToolMetadata,
+	type DiscoveredTool,
+} from '@ottocode/sdk';
 import type { ToolResultOutput } from '@ai-sdk/provider-utils';
 import type {
 	ToolAdapterContext,
 	StepExecutionState,
 } from '../runtime/tools/context.ts';
 import {
-	toClaudeCodeName,
+	buildRegistrationNames,
 	requiresClaudeCodeNaming,
 } from '../runtime/tools/mapping.ts';
 import {
@@ -19,7 +24,8 @@ import {
 	type ToModelOutputFn,
 	type ToModelOutputOptions,
 } from './adapter/model-output.ts';
-import type { PendingCallMeta } from './adapter/pending.ts';
+import { createToolCallRecords } from './adapter/pending.ts';
+import { boundModelOutput } from './adapter/result-compaction.ts';
 import {
 	stripToolResultArtifactsForModel,
 	type ToolFailureState,
@@ -39,7 +45,7 @@ export function adaptTools(
 	authType?: string,
 ) {
 	const out: Record<string, Tool> = {};
-	const pendingCalls = new Map<string, PendingCallMeta[]>();
+	const records = createToolCallRecords();
 	const failureState: ToolFailureState = {
 		active: false,
 		toolName: undefined,
@@ -51,6 +57,17 @@ export function adaptTools(
 		provider ?? '',
 		authType,
 	);
+	const registration = buildRegistrationNames(
+		tools.map(({ name }) => name),
+		useClaudeCodeNaming,
+	);
+	for (const collision of registration.collisions) {
+		logger.warn('[tools] rejected tool with colliding registration name', {
+			registration: collision.registration,
+			kept: collision.kept,
+			rejected: collision.rejected,
+		});
+	}
 
 	if (!ctx.stepExecution) {
 		ctx.stepExecution = { states: new Map<number, StepExecutionState>() };
@@ -64,14 +81,12 @@ export function adaptTools(
 
 	for (const { name: canonicalName, tool } of tools) {
 		const base = tool;
-		// Use PascalCase for Claude Code OAuth, otherwise canonical (snake_case)
-		const registrationName = useClaudeCodeNaming
-			? toClaudeCodeName(canonicalName)
-			: canonicalName;
+		// Use PascalCase for Claude Code OAuth, otherwise canonical (snake_case).
+		// Colliding names were rejected above and are not registered.
+		const registrationName = registration.names.get(canonicalName);
+		if (!registrationName || out[registrationName]) continue;
 		// Always use canonical name for DB storage and events
 		const name = canonicalName;
-
-		const processedToolErrors = new WeakSet<object>();
 
 		// Add cache control for Anthropic to cache tool definitions (max 2 tools)
 		const shouldCache =
@@ -94,22 +109,23 @@ export function adaptTools(
 				const baseToModelOutput = (base as { toModelOutput?: ToModelOutputFn })
 					.toModelOutput;
 				if (typeof baseToModelOutput === 'function') {
-					return baseToModelOutput(options);
+					// Custom renderers still go through the shared byte budget.
+					return boundModelOutput(baseToModelOutput(options));
 				}
 				const sanitizedOutput = stripToolResultArtifactsForModel(
 					options.output,
 					{ toolName: name },
 				);
-				return {
+				return boundModelOutput({
 					type: 'json',
 					value: toJsonValue(sanitizedOutput),
-				};
+				});
 			},
 			async onInputStart(options: unknown) {
 				await handleAdaptedToolInputStart({
 					base,
 					ctx,
-					pendingCalls,
+					records,
 					name,
 					options,
 				});
@@ -118,7 +134,7 @@ export function adaptTools(
 				await handleAdaptedToolInputDelta({
 					base,
 					ctx,
-					pendingCalls,
+					records,
 					name,
 					options,
 				});
@@ -127,7 +143,7 @@ export function adaptTools(
 				await handleAdaptedToolInputAvailable({
 					base,
 					ctx,
-					pendingCalls,
+					records,
 					name,
 					options,
 					markFirstToolCallReported: () => {
@@ -141,16 +157,17 @@ export function adaptTools(
 				return handleAdaptedToolExecute({
 					base,
 					ctx,
-					pendingCalls,
+					records,
 					name,
 					input,
 					options,
 					stepStates,
 					failureState,
-					processedToolErrors,
 				});
 			},
 		} as Tool;
+		const metadata = getToolMetadata(base);
+		if (metadata) setToolMetadata(out[registrationName], metadata);
 	}
 	return out;
 }

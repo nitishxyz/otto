@@ -254,7 +254,9 @@ describe('subagent inspection', () => {
 			messageId: compactMessageId,
 			index: 0,
 			type: 'text',
-			content: JSON.stringify({ text: 'Compacted child context.' }),
+			content: JSON.stringify({
+				text: 'Compacted child context: implementation findings, completed checks, and pending parent actions are preserved for the next turn.',
+			}),
 			agent: 'plan',
 			provider: 'test-provider',
 			model: 'model-with-no-catalog-entry',
@@ -269,6 +271,7 @@ describe('subagent inspection', () => {
 				model: 'model-with-no-catalog-entry',
 				projectRoot,
 				isCompactCommand: true,
+				compactionThroughMessageId: 'inspection-message',
 			},
 			db,
 			async () => {},

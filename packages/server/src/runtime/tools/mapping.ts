@@ -4,94 +4,37 @@
  * Claude Code OAuth requires PascalCase tool names but does NOT whitelist
  * specific tools. Any tool with a PascalCase name is accepted.
  *
- * This module provides bidirectional mapping between otto's canonical
- * snake_case names and the PascalCase format required for OAuth.
+ * Known names derive from the tool definition registry; other names use a
+ * snake_case → PascalCase conversion. Registration rejects collisions.
  */
+
+import { TOOL_DEFINITIONS } from './definitions.ts';
 
 export type ToolNamingConvention = 'canonical' | 'claude-code';
 
-/**
- * Mapping from otto canonical names to PascalCase names.
- * Includes ALL otto tools for complete OAuth compatibility.
- */
-export const CANONICAL_TO_PASCAL: Record<string, string> = {
-	// File system operations
-	read: 'Read',
-	edit: 'Edit',
-	multiedit: 'MultiEdit',
-	write: 'Write',
-	copy_into: 'CopyInto',
-	ls: 'Ls',
-	tree: 'Tree',
-	cd: 'Cd',
-	pwd: 'Pwd',
+/** Mapping from otto canonical names to PascalCase names. */
+export const CANONICAL_TO_PASCAL: Record<string, string> = Object.fromEntries(
+	TOOL_DEFINITIONS.flatMap((definition) =>
+		definition.claudeCodeName
+			? [[definition.name, definition.claudeCodeName]]
+			: [],
+	),
+);
 
-	// Search operations
-	search: 'Search',
-
-	// Execution
-	shell: 'Shell',
-	bash: 'Shell',
-	terminal: 'Terminal',
-
-	// Git operations
-	git_status: 'GitStatus',
-	git_diff: 'GitDiff',
-	git_commit: 'GitCommit',
-
-	// Patch
-	apply_patch: 'ApplyPatch',
-
-	// Task management
-	update_todos: 'UpdateTodos',
-	progress_update: 'ProgressUpdate',
-	finish: 'Finish',
-
-	// Web operations
-	websearch: 'WebSearch',
-};
-
-/**
- * Reverse mapping from PascalCase names to canonical.
- * Built to handle Claude Code style tool names.
- */
-export const PASCAL_TO_CANONICAL: Record<string, string> = {
-	// File system operations
-	Read: 'read',
-	Edit: 'edit',
-	MultiEdit: 'multiedit',
-	Write: 'write',
-	CopyInto: 'copy_into',
-	Ls: 'ls',
-	Tree: 'tree',
-	Cd: 'cd',
-	Pwd: 'pwd',
-
-	// Search operations
-	Grep: 'search',
-	Search: 'search',
-
-	// Execution
-	Shell: 'shell',
-	Bash: 'shell',
-	Terminal: 'terminal',
-
-	// Git operations
-	GitStatus: 'git_status',
-	GitDiff: 'git_diff',
-	GitCommit: 'git_commit',
-
-	// Patch
-	ApplyPatch: 'apply_patch',
-
-	// Task management
-	UpdateTodos: 'update_todos',
-	ProgressUpdate: 'progress_update',
-	Finish: 'finish',
-
-	// Web operations
-	WebSearch: 'websearch',
-};
+/** Reverse mapping from PascalCase names (including aliases) to canonical. */
+export const PASCAL_TO_CANONICAL: Record<string, string> = Object.fromEntries([
+	...TOOL_DEFINITIONS.flatMap((definition) =>
+		(definition.claudeCodeAliases ?? []).map((alias) => [
+			alias,
+			definition.name,
+		]),
+	),
+	...TOOL_DEFINITIONS.flatMap((definition) =>
+		definition.claudeCodeName
+			? [[definition.claudeCodeName, definition.name]]
+			: [],
+	),
+]);
 
 /**
  * Convert a canonical tool name to PascalCase format.
@@ -129,6 +72,39 @@ export function requiresClaudeCodeNaming(
 	authType?: string,
 ): boolean {
 	return provider === 'anthropic' && authType === 'oauth';
+}
+
+export type RegistrationCollision = {
+	registration: string;
+	kept: string;
+	rejected: string;
+};
+
+/**
+ * Computes provider-facing registration names for canonical tool names.
+ * When two different tools would register under the same name, the first
+ * keeps it and later ones are rejected (never silently remapped).
+ */
+export function buildRegistrationNames(
+	canonicalNames: readonly string[],
+	useClaudeCodeNaming: boolean,
+): { names: Map<string, string>; collisions: RegistrationCollision[] } {
+	const byRegistration = new Map<string, string>();
+	const names = new Map<string, string>();
+	const collisions: RegistrationCollision[] = [];
+	for (const canonical of canonicalNames) {
+		const registration = useClaudeCodeNaming
+			? toClaudeCodeName(canonical)
+			: canonical;
+		const existing = byRegistration.get(registration);
+		if (existing !== undefined && existing !== canonical) {
+			collisions.push({ registration, kept: existing, rejected: canonical });
+			continue;
+		}
+		byRegistration.set(registration, canonical);
+		names.set(canonical, registration);
+	}
+	return { names, collisions };
 }
 
 /**

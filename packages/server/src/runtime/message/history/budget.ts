@@ -52,15 +52,23 @@ function compactOldMessageText(message: ModelMessage): boolean {
 	return changed;
 }
 
+/**
+ * Bounds model history size in one pass: sizes are measured once per message
+ * and updated incrementally. Messages carrying tool calls/results are never
+ * rewritten, so call/result pairs stay intact; the newest 4 messages are kept.
+ */
 export function enforceModelHistoryBudget(
 	history: ModelMessage[],
 ): ModelMessage[] {
-	let totalBytes = jsonByteLength(history);
+	const sizes = history.map(jsonByteLength);
+	let totalBytes = sizes.reduce((sum, size) => sum + size, 0);
 	if (totalBytes <= MODEL_HISTORY_MAX_BYTES) return history;
 
 	for (let index = 0; index < history.length - 4; index++) {
 		if (!compactOldMessageText(history[index])) continue;
-		totalBytes = jsonByteLength(history);
+		const nextSize = jsonByteLength(history[index]);
+		totalBytes += nextSize - sizes[index];
+		sizes[index] = nextSize;
 		if (totalBytes <= MODEL_HISTORY_MAX_BYTES) break;
 	}
 	return history;

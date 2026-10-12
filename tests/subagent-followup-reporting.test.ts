@@ -50,6 +50,7 @@ beforeAll(async () => {
 			task: 'avoid stale delivery',
 			status: 'completed',
 			summary: 'initial result',
+			deliveryState: 'pending',
 			reported: false,
 			createdAt: now,
 			updatedAt: now,

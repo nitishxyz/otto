@@ -13,9 +13,9 @@ import {
 import { findSessionById } from './core.ts';
 import type { ProjectDbContext } from './types.ts';
 
-export function getSessionQueueState(sessionId: string) {
+export function getSessionQueueState(sessionId: string, projectRoot?: string) {
 	return (
-		getQueueState(sessionId) ?? {
+		getQueueState(sessionId, projectRoot) ?? {
 			currentMessageId: null,
 			queuedMessages: [],
 			isRunning: false,
@@ -67,6 +67,7 @@ async function deleteQueuedAssistantPair(
 export function sendSessionQueuedMessageNow(
 	sessionId: string,
 	messageId: string,
+	projectRoot?: string,
 ):
 	| {
 			body: {
@@ -79,7 +80,12 @@ export function sendSessionQueuedMessageNow(
 			status?: never;
 	  }
 	| { body: { success: false; promoted: false }; status: 404 } {
-	const result = sendQueuedMessageNow(sessionId, messageId, runSessionLoop);
+	const result = sendQueuedMessageNow(
+		sessionId,
+		messageId,
+		runSessionLoop,
+		projectRoot,
+	);
 	if (!result.success) {
 		return { body: { success: false, promoted: false }, status: 404 };
 	}
@@ -91,6 +97,7 @@ export async function removeSessionQueueMessage(
 	db: ProjectDbContext['db'],
 	sessionId: string,
 	messageId: string,
+	projectRoot?: string,
 ): Promise<
 	| { body: { success: true; removed: true; wasQueued: true }; status?: never }
 	| {
@@ -106,7 +113,7 @@ export async function removeSessionQueueMessage(
 	| { body: { success: false; error: string }; status: 500 }
 	| { body: { success: false; removed: false }; status: 404 }
 > {
-	const removed = removeFromQueue(sessionId, messageId);
+	const removed = removeFromQueue(sessionId, messageId, projectRoot);
 	if (removed) {
 		try {
 			await deleteQueuedAssistantPair(db, sessionId, messageId);
@@ -116,7 +123,7 @@ export async function removeSessionQueueMessage(
 		return { body: { success: true, removed: true, wasQueued: true } };
 	}
 
-	const result = abortMessage(sessionId, messageId);
+	const result = abortMessage(sessionId, messageId, projectRoot);
 	if (result.removed) {
 		return {
 			body: {

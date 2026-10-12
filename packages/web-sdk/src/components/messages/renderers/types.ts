@@ -154,6 +154,7 @@ export interface ContentJson {
 	args?: ToolCallArgs;
 	callId?: string;
 	result?: ToolResultData;
+	resultTruncated?: boolean;
 	artifact?: {
 		patch?: string;
 		summary?: {

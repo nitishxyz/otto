@@ -50,7 +50,10 @@ function serializeRejected(rejected: RejectedPatch[]) {
 	}));
 }
 
-export function buildApplyPatchTool(projectRoot: string): {
+export function buildApplyPatchTool(
+	projectRoot: string,
+	readOnlyRoots: readonly string[] = [],
+): {
 	name: string;
 	tool: Tool;
 } {
@@ -142,6 +145,7 @@ export function buildApplyPatchTool(projectRoot: string): {
 				const result = await applyPatchOperations(projectRoot, operations, {
 					useFuzzy: fuzzyMatch,
 					allowRejects,
+					readOnlyRoots,
 				});
 
 				const changes = serializeChanges(result.operations);

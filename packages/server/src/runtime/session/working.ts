@@ -6,6 +6,7 @@ import { getRunnerState } from './queue.ts';
 export interface SessionParentRelation {
 	id: string;
 	parentSessionId: string | null;
+	projectPath?: string | null;
 }
 
 /**
@@ -46,6 +47,7 @@ export async function getRunningSessionTreeIds(
 		.select({
 			id: sessions.id,
 			parentSessionId: sessions.parentSessionId,
+			projectPath: sessions.projectPath,
 		})
 		.from(sessions)
 		.where(
@@ -56,8 +58,16 @@ export async function getRunningSessionTreeIds(
 					)
 				: eq(sessions.sessionType, 'subagent'),
 		);
+	// Scope each lookup to the session's own project: an unscoped lookup
+	// throws when the same session id has runners in several projects.
 	const runningIds = relations
-		.filter((relation) => getRunnerState(relation.id)?.running === true)
+		.filter(
+			(relation) =>
+				getRunnerState(
+					relation.id,
+					projectRoot ?? relation.projectPath ?? undefined,
+				)?.running === true,
+		)
 		.map((relation) => relation.id);
 	return collectRunningSessionTreeIds(relations, runningIds);
 }
@@ -66,6 +76,7 @@ export async function getRunningSessionTreeIds(
 export async function hasRunningSubagentDescendant(
 	db: DB,
 	sessionId: string,
+	projectRoot?: string,
 ): Promise<boolean> {
-	return (await getRunningSessionTreeIds(db)).has(sessionId);
+	return (await getRunningSessionTreeIds(db, projectRoot)).has(sessionId);
 }

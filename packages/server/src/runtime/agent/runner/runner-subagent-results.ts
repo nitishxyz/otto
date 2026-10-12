@@ -4,64 +4,25 @@ import { logger } from '@ottocode/sdk';
 import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import type { ModelMessage } from 'ai';
 import {
+	type PrepareStepArgs,
+	type PrepareStepFn,
+	type PrepareStepResult,
+	type ResultPair,
+	withRetainedResultPairs,
+} from '../turn/prepare-step.ts';
+import {
 	publishToolCall,
 	publishToolResult,
 } from '../../../tools/adapter/events.ts';
 import type { ToolAdapterContext } from '../../tools/context.ts';
 import { buildSubagentResultsPrompt } from '../../subagents/prompt.ts';
+import { getModelLimits } from '../../message/compaction.ts';
+import {
+	claimSubagentResults,
+	SubagentResultClaimConflictError,
+} from '../../subagents/report.ts';
 
 const SUBAGENT_RESULT_TOOL_NAME = 'subagent_result';
-
-type PrepareStepArgs = {
-	stepNumber: number;
-	steps: unknown[];
-	messages: ModelMessage[];
-};
-
-type PrepareStepResult = Record<string, unknown> & {
-	messages?: ModelMessage[];
-};
-
-type PersistedResultPair = {
-	callId: string;
-	messages: ModelMessage[];
-};
-
-type RetainedResultPair = PersistedResultPair & {
-	insertionIndex: number;
-};
-
-function hasToolCallId(messages: ModelMessage[], callId: string): boolean {
-	return messages.some((message) => {
-		if (!Array.isArray(message.content)) return false;
-		return message.content.some(
-			(part) =>
-				typeof part === 'object' &&
-				part !== null &&
-				'toolCallId' in part &&
-				part.toolCallId === callId,
-		);
-	});
-}
-
-function insertRetainedPairs(
-	messages: ModelMessage[],
-	pairs: RetainedResultPair[],
-): ModelMessage[] {
-	const result = [...messages];
-	let offset = 0;
-	for (const pair of pairs) {
-		const insertionIndex = Math.min(
-			pair.insertionIndex + offset,
-			result.length,
-		);
-		if (!hasToolCallId(result, pair.callId)) {
-			result.splice(insertionIndex, 0, ...pair.messages);
-		}
-		offset += pair.messages.length;
-	}
-	return result;
-}
 
 function buildResultMessages(args: {
 	callId: string;
@@ -98,14 +59,14 @@ async function persistFinishedSubagentResults(args: {
 	db: DB;
 	ctx: ToolAdapterContext;
 	stepNumber: number;
-}): Promise<PersistedResultPair | undefined> {
+}): Promise<ResultPair | undefined> {
 	const candidates = await args.db
 		.select({ id: subagents.id })
 		.from(subagents)
 		.where(
 			and(
 				eq(subagents.parentSessionId, args.ctx.sessionId),
-				eq(subagents.reported, false),
+				eq(subagents.deliveryState, 'pending'),
 				ne(subagents.status, 'running'),
 			),
 		)
@@ -124,7 +85,7 @@ async function persistFinishedSubagentResults(args: {
 			.where(
 				and(
 					eq(subagents.parentSessionId, args.ctx.sessionId),
-					eq(subagents.reported, false),
+					eq(subagents.deliveryState, 'pending'),
 					ne(subagents.status, 'running'),
 				),
 			)
@@ -134,7 +95,12 @@ async function persistFinishedSubagentResults(args: {
 
 		const subagentIds = finished.map((record) => record.id);
 		const contextRows = tx
-			.select({ id: sessions.id, tokens: sessions.currentContextTokens })
+			.select({
+				id: sessions.id,
+				tokens: sessions.currentContextTokens,
+				provider: sessions.provider,
+				model: sessions.model,
+			})
 			.from(sessions)
 			.where(
 				inArray(
@@ -144,12 +110,21 @@ async function persistFinishedSubagentResults(args: {
 			)
 			.all();
 		const contextBySession = new Map(
-			contextRows.map((row) => [row.id, row.tokens]),
+			contextRows.map((row) => [
+				row.id,
+				{
+					tokens: row.tokens,
+					window: getModelLimits(row.provider, row.model)?.context ?? null,
+				},
+			]),
 		);
 		const prompt = buildSubagentResultsPrompt(
 			finished.map((record) => ({
 				...record,
-				contextTokens: contextBySession.get(record.childSessionId) ?? null,
+				contextTokens:
+					contextBySession.get(record.childSessionId)?.tokens ?? null,
+				contextWindowTokens:
+					contextBySession.get(record.childSessionId)?.window ?? null,
 			})),
 		);
 		const input = { subagentIds };
@@ -197,12 +172,11 @@ async function persistFinishedSubagentResults(args: {
 			])
 			.run();
 
-		for (const record of finished) {
-			tx.update(subagents)
-				.set({ reported: true, updatedAt: now })
-				.where(eq(subagents.id, record.id))
-				.run();
-		}
+		claimSubagentResults(tx, {
+			parentSessionId: args.ctx.sessionId,
+			deliveryKey: callId,
+			claims: finished,
+		});
 
 		return { subagentIds, prompt };
 	});
@@ -241,52 +215,29 @@ async function persistFinishedSubagentResults(args: {
  * fallback when the active turn has no subsequent step.
  */
 export function withSubagentResultsPrepareStep(
-	inner: ((args: PrepareStepArgs) => unknown) | undefined,
+	inner: PrepareStepFn | undefined,
 	context: { db: DB; ctx: ToolAdapterContext },
 ): (args: PrepareStepArgs) => Promise<PrepareStepResult | undefined> {
-	const retainedPairs: RetainedResultPair[] = [];
-	return async (args) => {
-		const innerResult = inner ? await inner(args) : undefined;
-		const base =
-			innerResult && typeof innerResult === 'object'
-				? (innerResult as PrepareStepResult)
-				: {};
-		const messages = base.messages ?? args.messages;
-		try {
-			const persisted = await persistFinishedSubagentResults({
-				db: context.db,
-				ctx: context.ctx,
-				stepNumber: args.stepNumber,
-			});
-			if (persisted) {
-				const retainedMessagesInBase = retainedPairs.reduce(
-					(count, pair) =>
-						count +
-						(hasToolCallId(messages, pair.callId) ? pair.messages.length : 0),
-					0,
-				);
-				retainedPairs.push({
-					...persisted,
-					insertionIndex: Math.max(0, messages.length - retainedMessagesInBase),
+	return withRetainedResultPairs(
+		inner,
+		async (args) => {
+			try {
+				return await persistFinishedSubagentResults({
+					db: context.db,
+					ctx: context.ctx,
+					stepNumber: args.stepNumber,
 				});
+			} catch (error) {
+				if (error instanceof SubagentResultClaimConflictError) return undefined;
+				throw error;
 			}
-		} catch (error) {
+		},
+		(error) => {
 			logger.warn('[subagent] failed to inject finished results', {
 				sessionId: context.ctx.sessionId,
 				messageId: context.ctx.messageId,
 				error: error instanceof Error ? error.message : String(error),
 			});
-		}
-
-		if (!retainedPairs.length) {
-			return innerResult && typeof innerResult === 'object'
-				? (innerResult as PrepareStepResult)
-				: undefined;
-		}
-
-		return {
-			...base,
-			messages: insertRetainedPairs(messages, retainedPairs),
-		};
-	};
+		},
+	);
 }

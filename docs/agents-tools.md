@@ -213,6 +213,113 @@ only receive the subset defined by their preset or config overrides.
 | `get_parent_session` | Resolve parent session linkage |
 | `present_action` | Present research findings/action links |
 
+### Path resolution and working directory
+
+Every path-valued input is resolved once by the tool adapter before guards
+and approvals run, and the tool executes with that same resolved value.
+Resolution expands `~`, anchors relative paths, resolves symlinks (for the
+target, or its nearest existing parent when it does not exist yet), and
+classifies the canonical target as project, read-only reference, or outside.
+Guards evaluate the canonical target, so a symlink inside the project that
+points elsewhere is treated as the place it points to.
+
+Relative paths are anchored per tool (defined in
+`packages/server/src/runtime/tools/definitions.ts`):
+
+| Tool | Field | Relative to |
+|---|---|---|
+| `read`, `ls`, `tree`, `write` | `path` | session cwd |
+| `cd` | `path` | session cwd; must be an existing directory in the project or a reference root |
+| `read_image`, `search`, `edit`, `multiedit` | `path` | project root |
+| `copy_into` | `sourcePath`, `targetPath` | project root |
+| `copy_attachment_to_project` | `targetPath` | project root |
+| `shell` | `cwd` | session cwd when omitted or `.`; otherwise project root |
+| `terminal` (`start`) | `cwd` | project root |
+
+The session cwd starts at the project root and only changes through `cd`.
+Resolved paths inside the project are passed to tools project-relative;
+paths outside are passed as canonical absolute paths.
+
+### Sensitive inputs
+
+Tools can declare secret-bearing input fields via `sensitiveInputs` in their
+tool metadata (`setToolMetadata`). Declared fields are redacted before the
+call is persisted, published, shown in approval prompts, or stored with the
+result, and streaming input deltas for such tools are not published. `forge`
+declares `apiKey`, `env.*`, and `headers.*`; for API-key auth the key is
+requested from the user through secure input when the model omits it.
+Known declared-secret values echoed in tool outputs/errors are scrubbed too.
+This protects declared fields and known values, not arbitrary undeclared secrets.
+Ask/provider credentials are request-scoped and do not mutate daemon-global
+`process.env`.
+
+### Execution and durability limits
+
+Tool execution records are keyed by call ID, not tool name or queue position.
+Execution outcome is separate from idempotent result persistence/finalization:
+a persistence failure must not cause a completed mutation to execute again.
+For absolute file-backed databases, a private file journal persists intent
+before execution and redacted outcome before SQLite result commit. Project-open
+recovery in standalone/embedded and daemon modes idempotently persists dead-owner
+results without reexecuting tools, publishing live events, or continuing the
+model. A crash after an external effect but before durable outcome leaves an
+explicit **outcome unknown** result: verify current state before retrying.
+In-memory databases have no restart journal. No journal schema/migration change
+is required. Content flushes acknowledge committed writes or reject, rather
+than reporting success after worker timeout alone.
+
+Project opening must register a run-owner lease before recovery or project-scoped
+runtime allocation. If registration fails, the open rejects rather than continuing
+with unprotected work; a later open can retry after the failure is resolved.
+The shared cached DB handle may already exist, but no project runtime is allocated.
+
+Recovery is single-host, same-user, shared PID namespace only. Conservative PID
+liveness preserves live owners and may delay recovery on PID reuse/permission
+uncertainty. Daemon interruption marking uses run-owner leases and a cutoff older
+than both daemon start and the oldest live foreign owner start; malformed or
+unreadable leases block marking until manual resolution. Private-directory
+nofollow/ownership/dev-inode validation reduces symlink/replacement risks, but a
+same-user swap away and back between checks remains possible without `openat`.
+Journal records are capped at 64 MiB, recovery at 10,000 directory entries per
+pass, and lease inspection at 1,024 entries of at most 4 KiB each. Corrupt journal
+records are quarantined for 7 days; unparseable temporary files expire after
+24 hours. Failed DB replay leaves the record for a later pass. Oversized outcomes
+can leave intent-only unknown results after restart; this is not exactly-once
+external execution or durable queued execution.
+
+Pipe and secure-PTY shell execution share `ShellExecution` lifecycle ownership
+for output collection, completion, timeout, cancellation and escalation; their
+transports and formatting/persistence adapters remain distinct. Persistent
+terminals still have a separate session manager. On macOS, production terminal
+spawn now uses a clean isolated Bun helper with a real PTY, avoiding the observed
+multithreaded-server native spawn hang on the tested in-process plugin-command
+route. The upstream Bun 1.4 `__wait4` issue itself is **not repaired**.
+
+Helper startup is asynchronous: the initial PID can be the helper PID (or 0),
+then becomes the PTY child PID after `ready`; a start response does not guarantee
+readiness or success. Startup times out after 5 seconds. Individual control
+frames are capped at 1 MiB and queued controls/pre-listener output at 2 MiB;
+acknowledgements provide backpressure. Invalid/oversized data or overflow
+terminates the transport, with forced termination after 1 second on transport
+failure. Process-group cleanup covers ordinary descendants, not processes that
+escape the group (for example via `setsid`); it is not a sandbox.
+
+Output backpressure pauses/resumes the process group with `SIGSTOP`/`SIGCONT`;
+if stalled for 5 seconds, the helper terminates it. Parent-loss cleanup resumes
+the group before `SIGTERM`, then escalates to `SIGKILL` after 500 ms.
+
+Canonical provider construction dispatch is owned by `@ottocode/sdk/providers`;
+server adapters retain authentication selection, discovery and payment policy.
+These continuation goals are **implemented and independently reviewed**, subject
+to the platform and recovery limits above, with no remaining identified review
+blockers for this scope. The last lease-registration fix received a narrow recheck,
+not another full combined rerun. Two archived-HEAD baseline failures remain and
+the full repository suite is not complete or green. See the
+[Harness reliability roadmap](./plans/harness-reliability-roadmap.md) for source,
+coverage and verification snapshots, and the
+[Database configuration boundary](./database-boundary.md) for public `getDb`
+initialization requirements. Task boards and remote execution remain out of scope.
+
 ---
 
 ## Agent overrides

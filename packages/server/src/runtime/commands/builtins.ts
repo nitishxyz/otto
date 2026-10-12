@@ -5,6 +5,7 @@ import {
 	getModelLimits,
 	isCompactCommand,
 } from '../message/compaction.ts';
+import { loadSessionMessages } from '../message/session-order.ts';
 import { prepareRecipeCommand } from './recipes.ts';
 
 export type BuiltinCommandPromptMessage = {
@@ -25,6 +26,7 @@ export type BuiltinCommandSpec = {
 	omitHistory?: boolean;
 	isCompactCommand?: boolean;
 	compactionContext?: string;
+	compactionThroughMessageId?: string;
 	additionalPromptMessages?: BuiltinCommandPromptMessage[];
 };
 
@@ -43,6 +45,11 @@ export async function prepareBuiltinCommand(args: {
 	content: string;
 }): Promise<BuiltinCommandSpec | null> {
 	if (isCompactCommand(args.content)) {
+		const sessionMessages = await loadSessionMessages(args.db, args.sessionId);
+		const compactionThroughMessageId = sessionMessages.at(-1)?.id;
+		if (!compactionThroughMessageId) {
+			throw new Error('Cannot compact an empty conversation');
+		}
 		const limits = getModelLimits(args.provider, args.model);
 		const contextTokenLimit = limits
 			? Math.max(Math.floor(limits.context * 0.5), 15000)
@@ -51,12 +58,14 @@ export async function prepareBuiltinCommand(args: {
 			args.db,
 			args.sessionId,
 			contextTokenLimit,
+			compactionThroughMessageId,
 		);
 		return {
 			id: 'compact',
 			isCompactCommand: true,
 			omitHistory: true,
 			compactionContext,
+			compactionThroughMessageId,
 		};
 	}
 

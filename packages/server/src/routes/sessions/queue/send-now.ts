@@ -45,7 +45,11 @@ export function registerSendQueuedMessageNowRoute(app: Hono) {
 			await sessionRepository(project.db, project.projectRoot).require(
 				sessionId,
 			);
-			const result = sendSessionQueuedMessageNow(sessionId, messageId);
+			const result = sendSessionQueuedMessageNow(
+				sessionId,
+				messageId,
+				project.projectRoot,
+			);
 			return result.status
 				? c.json(result.body, result.status)
 				: c.json(result.body);

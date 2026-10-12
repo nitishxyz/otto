@@ -50,13 +50,20 @@ function getVendorSearchPaths(binaryName: string): string[] {
 		);
 	}
 
-	const cwd = process.cwd();
-	paths.push(join(cwd, 'vendor', 'bin', platformKey, binaryName));
-
 	return paths;
 }
 
-export async function extractFromVendor(name: string): Promise<string | null> {
+const extractions = new Map<string, Promise<string | null>>();
+
+export function extractFromVendor(name: string): Promise<string | null> {
+	const existing = extractions.get(name);
+	if (existing) return existing;
+	const pending = extract(name).finally(() => extractions.delete(name));
+	extractions.set(name, pending);
+	return pending;
+}
+
+async function extract(name: string): Promise<string | null> {
 	const binaryName = getBinaryFileName(name);
 	const binDir = getAgiBinDir();
 	const targetPath = join(binDir, binaryName);
@@ -70,8 +77,14 @@ export async function extractFromVendor(name: string): Promise<string | null> {
 	for (const src of searchPaths) {
 		if (await fileExists(src)) {
 			await ensureDir(binDir);
-			await fs.copyFile(src, targetPath);
-			await makeExecutable(targetPath);
+			const temporary = `${targetPath}.${crypto.randomUUID()}.tmp`;
+			try {
+				await fs.copyFile(src, temporary);
+				await makeExecutable(temporary);
+				await fs.rename(temporary, targetPath);
+			} finally {
+				await fs.rm(temporary, { force: true });
+			}
 			return targetPath;
 		}
 	}

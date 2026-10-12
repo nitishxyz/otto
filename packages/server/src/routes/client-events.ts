@@ -3,13 +3,8 @@ import { logger } from '@ottocode/sdk';
 import type { Context } from 'hono';
 import type { Hono } from 'hono';
 import { subscribeClientEvents } from '../events/bus.ts';
-import {
-	createSSEEncodingCache,
-	createSSEResponse,
-	encodeSSEComment,
-	encodeSSEEvent,
-} from '../events/sse.ts';
-import type { ClientEvent } from '../events/types.ts';
+import { createSSEResponse, encodeSSEComment } from '../events/sse.ts';
+import { encodeClientStreamEvent } from '../events/stream-encoding.ts';
 import { zodOpenApiRoute } from '../openapi/route.ts';
 
 const STREAM_DESCRIPTION =
@@ -30,10 +25,6 @@ const clientEventsStreamSchema = z.string().openapi({
 	description: STREAM_DESCRIPTION,
 });
 
-const encodeEvent = createSSEEncodingCache((evt: ClientEvent) =>
-	encodeSSEEvent(evt.type, evt.payload ?? {}),
-);
-
 function handleClientEventsStream(c: Context) {
 	return createSSEResponse({
 		signal: c.req.raw?.signal,
@@ -41,7 +32,7 @@ function handleClientEventsStream(c: Context) {
 		heartbeat: {
 			intervalMs: 5000,
 			createChunk: () =>
-				encodeEvent({
+				encodeClientStreamEvent({
 					type: 'heartbeat',
 					payload: { createdAt: new Date().toISOString() },
 				}),
@@ -52,7 +43,9 @@ function handleClientEventsStream(c: Context) {
 			});
 		},
 		start({ send, onCleanup }) {
-			onCleanup(subscribeClientEvents((evt) => send(encodeEvent(evt))));
+			onCleanup(
+				subscribeClientEvents((evt) => send(encodeClientStreamEvent(evt))),
+			);
 		},
 	});
 }

@@ -1,5 +1,7 @@
 # Remote Agents — Always-On Control Plane + Turso Sync
 
+> **Status (October 2026):** not started. The assumption that only `getDbByPath` needs swapping is invalid: orchestration uses synchronous SQLite transactions and in-memory queue/process ownership. Revisit alongside the task-board and remote-execution design; see [harness-reliability-roadmap.md](harness-reliability-roadmap.md).
+
 Requirements that shape everything:
 
 1. Trigger remote agents from any client (local otto, mobile app, web) via a

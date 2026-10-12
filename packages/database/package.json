@@ -18,6 +18,10 @@
 		"./schema": {
 			"import": "./src/schema.ts",
 			"types": "./src/schema.ts"
+		},
+		"./markers": {
+			"import": "./src/runtime/markers.ts",
+			"types": "./src/runtime/markers.ts"
 		}
 	},
 	"scripts": {
@@ -27,7 +31,6 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@ottocode/sdk": "workspace:*",
 		"drizzle-orm": "0.44.7"
 	},
 	"devDependencies": {

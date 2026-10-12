@@ -4,8 +4,9 @@ import {
 	getProjectsStateRoot,
 	logger,
 } from '@ottocode/sdk';
-import { mkdir, readdir } from 'node:fs/promises';
+import { mkdir, readdir, rename, unlink } from 'node:fs/promises';
 import { toErrorLogPayload } from '../errors/handling.ts';
+import { acquireRegistryLock } from './registry-lock.ts';
 
 /**
  * Project registry — tracks otto projects this user has opened.
@@ -50,6 +51,32 @@ interface RegistryStorage {
 const TOUCH_DEBOUNCE_MS = 60_000;
 const STATE_DISCOVERY_CACHE_TTL_MS = 5 * 60_000;
 const touchedThisSession = new Map<string, number>();
+const mutations = new Map<string, Promise<unknown>>();
+
+async function mutateRegistry<T>(
+	storage: RegistryStorage,
+	mutate: () => Promise<T>,
+): Promise<T> {
+	const previous = mutations.get(storage.registryPath) ?? Promise.resolve();
+	const pending = previous
+		.catch(() => {})
+		.then(async () => {
+			await mkdir(storage.configDir, { recursive: true });
+			const lock = await acquireRegistryLock(storage.registryPath);
+			try {
+				return await mutate();
+			} finally {
+				lock.release();
+			}
+		});
+	mutations.set(storage.registryPath, pending);
+	try {
+		return await pending;
+	} finally {
+		if (mutations.get(storage.registryPath) === pending)
+			mutations.delete(storage.registryPath);
+	}
+}
 const stateDiscoveryCache = new Map<
 	string,
 	{ expiresAt: number; projects: RegisteredProject[] }
@@ -224,20 +251,22 @@ async function loadRegistry(storage: RegistryStorage): Promise<RegistryFile> {
 		logger.warn('Failed to load projects registry', {
 			error: toErrorLogPayload(error),
 		});
+		throw error;
 	}
-	return { version: 1, projects: [], forgottenRoots: [] };
+	throw new Error(`Invalid projects registry: ${storage.registryPath}`);
 }
 
 async function saveRegistry(
 	storage: RegistryStorage,
 	reg: RegistryFile,
 ): Promise<void> {
+	const temporaryPath = `${storage.registryPath}.${crypto.randomUUID()}.tmp`;
 	try {
-		await mkdir(storage.configDir, { recursive: true });
-		await Bun.write(storage.registryPath, `${JSON.stringify(reg, null, 2)}\n`);
-	} catch (error) {
-		logger.warn('Failed to write projects registry', {
-			error: toErrorLogPayload(error),
+		await Bun.write(temporaryPath, `${JSON.stringify(reg, null, 2)}\n`);
+		await rename(temporaryPath, storage.registryPath);
+	} finally {
+		await unlink(temporaryPath).catch((error: NodeJS.ErrnoException) => {
+			if (error.code !== 'ENOENT') throw error;
 		});
 	}
 }
@@ -251,12 +280,12 @@ export async function touchProject(
 	dbPath: string,
 ): Promise<void> {
 	const storage = resolveRegistryStorage();
-	try {
+	await mutateRegistry(storage, async () => {
 		void dbPath;
 		const now = Date.now();
-		const last = touchedThisSession.get(projectRoot);
+		const touchKey = `${storage.registryPath}:${projectRoot}`;
+		const last = touchedThisSession.get(touchKey);
 		if (last && now - last < TOUCH_DEBOUNCE_MS) return;
-		touchedThisSession.set(projectRoot, now);
 
 		const reg = await loadRegistry(storage);
 		reg.forgottenRoots = reg.forgottenRoots.filter(
@@ -287,11 +316,8 @@ export async function touchProject(
 			});
 		}
 		await saveRegistry(storage, reg);
-	} catch (error) {
-		logger.warn('Failed to touch project registry', {
-			error: toErrorLogPayload(error),
-		});
-	}
+		touchedThisSession.set(touchKey, now);
+	});
 }
 
 /**
@@ -316,12 +342,14 @@ export async function setProjectPinned(
 	pinned: boolean,
 ): Promise<boolean> {
 	const storage = resolveRegistryStorage();
-	const reg = await loadRegistry(storage);
-	const project = reg.projects.find((item) => item.path === projectRoot);
-	if (!project) return false;
-	project.pinned = pinned;
-	await saveRegistry(storage, reg);
-	return true;
+	return mutateRegistry(storage, async () => {
+		const reg = await loadRegistry(storage);
+		const project = reg.projects.find((item) => item.path === projectRoot);
+		if (!project) return false;
+		project.pinned = pinned;
+		await saveRegistry(storage, reg);
+		return true;
+	});
 }
 
 /**
@@ -339,10 +367,13 @@ export async function forgetProjects(projectRoots: string[]): Promise<void> {
 	if (roots.size === 0) return;
 
 	const storage = resolveRegistryStorage();
-	const reg = await loadRegistry(storage);
-	const next = reg.projects.filter((p) => !roots.has(p.path));
-	reg.projects = next;
-	reg.forgottenRoots = [...new Set([...reg.forgottenRoots, ...roots])];
-	for (const root of roots) touchedThisSession.delete(root);
-	await saveRegistry(storage, reg);
+	await mutateRegistry(storage, async () => {
+		const reg = await loadRegistry(storage);
+		const next = reg.projects.filter((p) => !roots.has(p.path));
+		reg.projects = next;
+		reg.forgottenRoots = [...new Set([...reg.forgottenRoots, ...roots])];
+		await saveRegistry(storage, reg);
+		for (const root of roots)
+			touchedThisSession.delete(`${storage.registryPath}:${root}`);
+	});
 }

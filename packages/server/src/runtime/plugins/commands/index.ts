@@ -15,18 +15,23 @@ export {
 	parsePluginCommandArgs,
 	parsePluginCommandInvocation,
 	tokenizePluginCommandArgs,
+	validatePluginCommandTypedArgs,
 } from './parse.ts';
 
 export { renderPluginCommand } from './render.ts';
 export {
 	buildPluginCommandTitle,
 	createServerTerminalBridge,
+	executePreparedPluginCommand,
 	formatRenderedCommand,
+	preparePluginCommand,
 	runPluginCommand,
 } from './execute.ts';
 export type {
 	PluginCommandRunInput,
 	PluginCommandTerminalBridge,
+	PreparedPluginCommand,
+	PreparePluginCommandResult,
 } from './execute.ts';
 export type { PluginCommandRunResult } from './types.ts';
 export { normalizePluginCommandRunInput } from './parse.ts';

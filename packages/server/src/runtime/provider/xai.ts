@@ -1,11 +1,12 @@
 import type { OttoConfig } from '@ottocode/sdk';
 import {
-	getAuth,
 	setAuth,
 	refreshXaiToken,
-	createXaiModel,
 	isXaiGrokCliModel,
+	getProviderDefinition,
 } from '@ottocode/sdk';
+import { createProviderModel } from '@ottocode/sdk/providers';
+import { getRunProviderAuth } from './credentials.ts';
 import { providerFetch } from './fetch.ts';
 
 export async function getXaiInstance(
@@ -13,7 +14,7 @@ export async function getXaiInstance(
 	model: string,
 	sessionId?: string,
 ) {
-	const auth = await getAuth('xai', cfg.projectRoot);
+	const auth = await getRunProviderAuth('xai', cfg.projectRoot);
 	if (auth?.type === 'oauth') {
 		let currentAuth = auth;
 		if (currentAuth.expires < Date.now()) {
@@ -28,12 +29,11 @@ export async function getXaiInstance(
 			};
 			await setAuth('xai', currentAuth, cfg.projectRoot, 'global');
 		}
-		return createXaiModel(model, {
-			apiKey: currentAuth.access,
-			useResponses: true,
-			useGrokCliProxy: isXaiGrokCliModel(model),
-			promptCacheKey: sessionId,
-			fetch: providerFetch,
+		return createProviderModel('xai', model, {
+			oauth: currentAuth,
+			sessionId,
+			baseURL: getProviderDefinition(cfg, 'xai')?.baseURL,
+			customFetch: providerFetch,
 		});
 	}
 
@@ -44,9 +44,10 @@ export async function getXaiInstance(
 	}
 
 	const apiKey = auth?.type === 'api' ? auth.key : undefined;
-	return createXaiModel(model, {
+	return createProviderModel('xai', model, {
 		apiKey,
-		promptCacheKey: sessionId,
-		fetch: providerFetch,
+		sessionId,
+		baseURL: getProviderDefinition(cfg, 'xai')?.baseURL,
+		customFetch: providerFetch,
 	});
 }

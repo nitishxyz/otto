@@ -1,9 +1,15 @@
 import type { getDb } from '@ottocode/database';
-import { messages, messageParts } from '@ottocode/database/schema';
-import { eq, asc, and, lt } from 'drizzle-orm';
+import { messageParts } from '@ottocode/database/schema';
+import { inArray } from 'drizzle-orm';
 import { estimateTokens, PRUNE_PROTECT } from './compaction-limits.ts';
+import {
+	loadSessionMessages,
+	loadSessionPartsByMessageId,
+} from './session-order.ts';
 
 const PROTECTED_TOOLS = ['skill'];
+
+type Db = Awaited<ReturnType<typeof getDb>>;
 
 type PartInfo = {
 	id: string;
@@ -18,45 +24,31 @@ type CompactUnit = {
 	tokens: number;
 };
 
-export async function markSessionCompacted(
-	db: Awaited<ReturnType<typeof getDb>>,
+export type CompactionPlan = { partIds: string[]; saved: number };
+
+/**
+ * Selects old tool call/result units (strictly before the boundary message)
+ * to hide from model history. Read-only; apply via installCompactionCheckpoint
+ * or markSessionCompacted.
+ */
+export async function planSessionCompaction(
+	db: Db,
 	sessionId: string,
-	compactMessageId: string,
-	throughMessageId?: string,
-): Promise<{ compacted: number; saved: number }> {
-	const cutoffMsg = await db
-		.select()
-		.from(messages)
-		.where(eq(messages.id, throughMessageId ?? compactMessageId))
-		.limit(1);
-
-	if (!cutoffMsg.length) {
-		return { compacted: 0, saved: 0 };
-	}
-
-	const cutoffTime = cutoffMsg[0].createdAt;
-
-	const oldMessages = await db
-		.select()
-		.from(messages)
-		.where(
-			and(
-				eq(messages.sessionId, sessionId),
-				lt(messages.createdAt, cutoffTime),
-			),
-		)
-		.orderBy(asc(messages.createdAt));
+	boundaryMessageId: string,
+): Promise<CompactionPlan> {
+	const sessionMessages = await loadSessionMessages(db, sessionId);
+	const cutoffIndex = sessionMessages.findIndex(
+		(message) => message.id === boundaryMessageId,
+	);
+	if (cutoffIndex < 0) return { partIds: [], saved: 0 };
+	const oldMessages = sessionMessages.slice(0, cutoffIndex);
+	const partsByMessageId = await loadSessionPartsByMessageId(db, sessionId);
 
 	const allCompactUnits: CompactUnit[] = [];
 	let totalToolTokens = 0;
 
 	for (const msg of oldMessages) {
-		const parts = await db
-			.select()
-			.from(messageParts)
-			.where(eq(messageParts.messageId, msg.id))
-			.orderBy(asc(messageParts.index));
-
+		const parts = partsByMessageId.get(msg.id) ?? [];
 		const eligibleParts: PartInfo[] = [];
 
 		for (const part of parts) {
@@ -125,36 +117,48 @@ export async function markSessionCompacted(
 	}
 
 	const tokensToFree = Math.max(0, totalToolTokens - PRUNE_PROTECT);
-
-	const toCompact: CompactUnit[] = [];
+	const partIds: string[] = [];
 	let freedTokens = 0;
-
 	for (const unit of allCompactUnits) {
 		if (freedTokens >= tokensToFree) break;
 		freedTokens += unit.tokens;
-		toCompact.push(unit);
+		partIds.push(...unit.partIds);
 	}
+	return { partIds, saved: freedTokens };
+}
 
-	if (toCompact.length > 0) {
-		const compactedAt = Date.now();
-
-		for (const unit of toCompact) {
-			for (const partId of unit.partIds) {
-				try {
-					await db
-						.update(messageParts)
-						.set({ compactedAt })
-						.where(eq(messageParts.id, partId));
-				} catch {}
-			}
+/**
+ * Marks part ids compacted in one transaction and returns how many rows were
+ * confirmed updated. Throws on persistence failure.
+ */
+export function applyPartCompaction(db: Db, partIds: string[]): number {
+	if (partIds.length === 0) return 0;
+	const compactedAt = Date.now();
+	return db.transaction((tx) => {
+		let updated = 0;
+		for (let start = 0; start < partIds.length; start += 500) {
+			updated += tx
+				.update(messageParts)
+				.set({ compactedAt })
+				.where(inArray(messageParts.id, partIds.slice(start, start + 500)))
+				.returning({ id: messageParts.id })
+				.all().length;
 		}
+		return updated;
+	});
+}
 
-		const compactedParts = toCompact.reduce(
-			(sum, unit) => sum + unit.partIds.length,
-			0,
-		);
-		return { compacted: compactedParts, saved: freedTokens };
-	}
-
-	return { compacted: 0, saved: freedTokens };
+export async function markSessionCompacted(
+	db: Db,
+	sessionId: string,
+	compactMessageId: string,
+	throughMessageId?: string,
+): Promise<{ compacted: number; saved: number }> {
+	const plan = await planSessionCompaction(
+		db,
+		sessionId,
+		throughMessageId ?? compactMessageId,
+	);
+	const compacted = applyPartCompaction(db, plan.partIds);
+	return { compacted, saved: plan.saved };
 }

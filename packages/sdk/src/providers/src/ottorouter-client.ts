@@ -18,6 +18,7 @@ export type OttoRouterBalanceUpdate = BalanceUpdate;
 export type OttoRouterPaymentCallbacks = PaymentCallbacks;
 
 export type OttoRouterProviderOptions = {
+	fetch?: typeof fetch;
 	baseURL?: string;
 	rpcURL?: string;
 	network?: string;
@@ -61,6 +62,7 @@ function buildOttoRouterConfig(
 ): OttoRouterConfig {
 	return {
 		auth,
+		fetch: options.fetch,
 		baseURL: options.baseURL,
 		rpcURL: options.rpcURL,
 		callbacks: options.callbacks,

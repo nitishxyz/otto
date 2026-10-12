@@ -5,7 +5,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-import { getShellEnvironment } from '../tools/bin-manager.ts';
+import { getShellEnvironmentAsync } from '../tools/bin-manager.ts';
 import type { MCPServerConfig } from './types.ts';
 
 /** MCP tool annotations (spec hints). All are advisory and may be absent. */
@@ -108,7 +108,7 @@ export class MCPClientWrapper {
 		const transport = new StdioClientTransport({
 			command: this.config.command,
 			args: this.config.args,
-			env: { ...getShellEnvironment(), ...customEnv },
+			env: { ...(await getShellEnvironmentAsync()), ...customEnv },
 			cwd: this.config.cwd,
 			stderr: 'pipe',
 		});
@@ -207,8 +207,19 @@ export class MCPClientWrapper {
 	async callTool(
 		name: string,
 		args: Record<string, unknown>,
+		options: { signal?: AbortSignal; timeoutMs?: number } = {},
 	): Promise<unknown> {
-		const result = await this.client.callTool({ name, arguments: args });
+		options.signal?.throwIfAborted();
+		const result = await this.client.callTool(
+			{ name, arguments: args },
+			undefined,
+			{
+				...(options.signal ? { signal: options.signal } : {}),
+				...(options.timeoutMs !== undefined
+					? { timeout: options.timeoutMs, maxTotalTimeout: options.timeoutMs }
+					: {}),
+			},
+		);
 		const images = extractImages(result.content);
 		if (result.isError) {
 			return {

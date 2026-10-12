@@ -23,6 +23,8 @@
 ## Architecture & development
 
 - [Architecture](architecture.md)
+- [Harness reliability roadmap: reviewed residual goals, recovery limits and verification snapshots](plans/harness-reliability-roadmap.md)
+- [Database configuration boundary and public accessor initialization](database-boundary.md)
 - [Development](development.md)
 - [Development Guide](development-guide.md)
 - [Mobile development](mobile-development.md)

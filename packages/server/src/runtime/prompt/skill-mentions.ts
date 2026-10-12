@@ -28,10 +28,10 @@ export async function buildExplicitSkillMentionContext({
 
 	const blocks: string[] = [];
 	for (const name of mentionedSkills) {
-		const skill = await loadSkill(name);
+		const skill = await loadSkill(name, skills);
 		if (!skill) continue;
 
-		const availableFiles = await discoverSkillFiles(name);
+		const availableFiles = await discoverSkillFiles(name, skills);
 		const fileManifest =
 			availableFiles.length > 0
 				? availableFiles

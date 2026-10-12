@@ -1,6 +1,10 @@
 import type { getDb } from '@ottocode/database';
-import { messages, messageParts, sessions } from '@ottocode/database/schema';
-import { eq, asc, desc } from 'drizzle-orm';
+import {
+	loadSessionMessages,
+	loadSessionPartsByMessageId,
+	readCheckpointBoundary,
+	splitAtCheckpoint,
+} from './session-order.ts';
 
 const PREVIOUS_CHECKPOINT_MAX_CHARS = 6_000;
 
@@ -19,35 +23,29 @@ export async function buildCompactionContext(
 	contextTokenLimit?: number,
 	throughMessageId?: string,
 ): Promise<string> {
-	const sessionRows = await db
-		.select({
-			contextSummary: sessions.contextSummary,
-			compactionMessageId: sessions.compactionMessageId,
-		})
-		.from(sessions)
-		.where(eq(sessions.id, sessionId))
-		.limit(1);
-	const previousCheckpoint = sessionRows[0]?.contextSummary?.trim() ?? '';
-	const compactionMessageId = sessionRows[0]?.compactionMessageId ?? undefined;
-	const sessionMessages = await db
-		.select()
-		.from(messages)
-		.where(eq(messages.sessionId, sessionId))
-		.orderBy(desc(messages.createdAt));
+	const boundary = await readCheckpointBoundary(db, sessionId);
+	const previousCheckpoint = boundary.contextSummary?.trim() ?? '';
+	const sessionMessages = await loadSessionMessages(db, sessionId);
 	const cutoffIndex = throughMessageId
 		? sessionMessages.findIndex((msg) => msg.id === throughMessageId)
 		: -1;
 	if (throughMessageId && cutoffIndex < 0) {
 		throw new Error('Compaction boundary message not found');
 	}
-	let allMessages =
-		cutoffIndex >= 0 ? sessionMessages.slice(cutoffIndex) : sessionMessages;
-	const checkpointIndex = compactionMessageId
-		? allMessages.findIndex((msg) => msg.id === compactionMessageId)
-		: -1;
-	if (checkpointIndex >= 0) {
-		allMessages = allMessages.slice(0, checkpointIndex);
-	}
+	const throughCutoff =
+		cutoffIndex >= 0
+			? sessionMessages.slice(0, cutoffIndex + 1)
+			: sessionMessages;
+	// Evidence after the previous checkpoint's boundary, without its summary message.
+	const { after: allMessages, boundaryRow } = splitAtCheckpoint(
+		throughCutoff,
+		boundary,
+	);
+	const partsByMessageId = await loadSessionPartsByMessageId(
+		db,
+		sessionId,
+		boundaryRow?.sequence,
+	);
 
 	const maxChars = Math.max(0, Math.floor((contextTokenLimit ?? 15_000) * 4));
 	const result: string[] = [];
@@ -74,12 +72,8 @@ export async function buildCompactionContext(
 		user: boolean;
 		narrative: boolean;
 	}[] = [];
-	for (const msg of allMessages.toReversed()) {
-		const parts = await db
-			.select()
-			.from(messageParts)
-			.where(eq(messageParts.messageId, msg.id))
-			.orderBy(asc(messageParts.index));
+	for (const msg of allMessages) {
+		const parts = partsByMessageId.get(msg.id) ?? [];
 		for (const part of parts) {
 			if (part.compactedAt) continue;
 			try {

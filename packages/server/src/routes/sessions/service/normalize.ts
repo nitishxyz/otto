@@ -16,12 +16,14 @@ export function parseToolCounts(
 
 export function normalizeSessionRow(
 	row: SessionRow,
-	options: { includeRunning?: boolean } = {},
+	options: { includeRunning?: boolean; projectRoot?: string } = {},
 ) {
 	const { toolCountsJson: _toolCountsJson, ...rest } = row;
 	const counts = parseToolCounts(row.toolCountsJson);
 	const base = counts ? { ...rest, toolCounts: counts } : rest;
 	if (!options.includeRunning) return base;
-	const isRunning = getRunnerState(row.id)?.running ?? false;
+	const isRunning =
+		getRunnerState(row.id, options.projectRoot ?? row.projectPath)?.running ??
+		false;
 	return { ...base, isRunning };
 }

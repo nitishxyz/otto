@@ -104,6 +104,30 @@ async function executeTool(
 	return { result, deltas };
 }
 
+/**
+ * Resolves the declared effects of the native tool a forge `plugin-tool`
+ * `execute` call would actually run, so approval can evaluate the real target.
+ * Returns undefined for non-execute inputs and dry runs (nothing executes).
+ */
+export async function resolveForgePluginToolExecutionEffects(
+	projectRoot: string,
+	input: ForgeInput,
+): Promise<PluginTool['effects'] | undefined> {
+	if (input.kind !== 'plugin-tool' || input.action !== 'execute') return;
+	if (input.dryRun) return;
+	const { plugin: pluginName, toolName } = toolIdentity(input);
+	const plugin = await resolveForgePlugin(
+		projectRoot,
+		pluginName,
+		input.scope ?? 'project',
+	);
+	const tool = plugin.manifest?.tools?.find((item) => item.name === toolName);
+	if (!tool) {
+		throw new Error(`Native tool '${pluginName}__${toolName}' not found`);
+	}
+	return tool.effects ?? [];
+}
+
 export async function runForgePluginToolAction(
 	projectRoot: string,
 	input: ForgeInput,
@@ -142,6 +166,26 @@ export async function runForgePluginToolAction(
 	if (input.action === 'execute') {
 		if (!existing)
 			throw new Error(`Native tool '${pluginName}__${toolName}' not found`);
+		if (!plugin.enabled) {
+			throw new Error(
+				`Plugin '${pluginName}' is disabled; enable it before executing its tools`,
+			);
+		}
+		if (input.dryRun) {
+			return {
+				ok: true,
+				applied: false,
+				execution: null,
+				preview: {
+					tool: `${pluginName}__${toolName}`,
+					entry: existing.entry,
+					effects: existing.effects ?? [],
+					secrets: existing.secrets ?? [],
+					timeoutMs: existing.timeoutMs,
+					input: input.toolInput ?? {},
+				},
+			};
+		}
 		return {
 			ok: true,
 			execution: await executeTool(

@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { resolveAgentConfig } from '@ottocode/server';
 
 async function read(path: string) {
@@ -20,9 +23,16 @@ describe('agent prompt resolution', () => {
 	});
 
 	it('prefers local project override if present', async () => {
-		const tmp = `${process.cwd()}/.otto/agents/testagent`;
-		await Bun.write(`${tmp}/agent.md`, 'PROJECT OVERRIDE TEST');
-		const cfg = await resolveAgentConfig(process.cwd(), 'testagent');
-		expect(cfg.prompt.trim()).toBe('PROJECT OVERRIDE TEST');
+		const projectRoot = await mkdtemp(join(tmpdir(), 'otto-agent-prompts-'));
+		try {
+			await Bun.write(
+				join(projectRoot, '.otto', 'agents', 'testagent', 'agent.md'),
+				'PROJECT OVERRIDE TEST',
+			);
+			const cfg = await resolveAgentConfig(projectRoot, 'testagent');
+			expect(cfg.prompt.trim()).toBe('PROJECT OVERRIDE TEST');
+		} finally {
+			await rm(projectRoot, { recursive: true, force: true });
+		}
 	});
 });

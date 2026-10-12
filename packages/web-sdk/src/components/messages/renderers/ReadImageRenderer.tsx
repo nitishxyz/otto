@@ -1,4 +1,5 @@
 import { ImageIcon } from 'lucide-react';
+import { getReadImageSource } from '../../../lib/read-image';
 import type { RendererProps } from './types';
 import { formatDuration } from './utils';
 import { ToolErrorDisplay } from './ToolErrorDisplay';
@@ -56,15 +57,16 @@ export function ReadImageRenderer({
 
 	const path = getString(result.path) || getString(args.path);
 	const mediaType = getString(result.mediaType);
-	const data = getString(result.data);
 	const width = getNumber(result.width);
 	const height = getNumber(result.height);
 	const size = formatBytes(result.size);
 	const transmittedSize = formatBytes(result.transmittedSize);
 	const isCompressed = result.compressed === true;
-	const hasImage = mediaType.length > 0 && data.length > 0;
+	const src = contentJson.resultTruncated
+		? undefined
+		: getReadImageSource(result);
+	const hasImage = Boolean(src);
 	const canExpand = hasToolError || hasImage;
-	const src = hasImage ? `data:${mediaType};base64,${data}` : undefined;
 	const dimensions = width && height ? `${width}×${height}` : null;
 	const sizeLabel = transmittedSize || size;
 

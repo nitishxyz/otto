@@ -46,25 +46,57 @@ function formatWarning(
 	}
 }
 
-let installed = false;
+type WarningHandler = ((options: LogWarningsOptions) => void) | false;
+
+type WarningGlobal = { AI_SDK_LOG_WARNINGS?: WarningHandler };
+
+const warningGlobal = globalThis as unknown as WarningGlobal;
+
+let installation: {
+	handler: WarningHandler;
+	previous: WarningHandler | undefined;
+	hadPrevious: boolean;
+	refs: number;
+} | null = null;
+
+function suppressingHandler(options: LogWarningsOptions): void {
+	if (!isDebugEnabled()) return;
+	if (!options.warnings?.length) return;
+	for (const warning of options.warnings) {
+		console.warn(formatWarning(warning, options.provider, options.model));
+	}
+}
 
 /**
  * Install a custom AI SDK warning handler that suppresses warnings unless
- * debug mode is enabled. Safe to call multiple times (installs once).
+ * debug mode is enabled. Installs are reference counted; the returned
+ * function restores the previous global handler once every install has been
+ * released (and only if no one replaced the handler in the meantime).
  */
-export function installAiSdkWarningHandler(): void {
-	if (installed) return;
-	installed = true;
-
-	(
-		globalThis as unknown as {
-			AI_SDK_LOG_WARNINGS?: ((options: LogWarningsOptions) => void) | false;
-		}
-	).AI_SDK_LOG_WARNINGS = (options: LogWarningsOptions) => {
-		if (!isDebugEnabled()) return;
-		if (!options.warnings?.length) return;
-		for (const warning of options.warnings) {
-			console.warn(formatWarning(warning, options.provider, options.model));
+export function installAiSdkWarningHandler(): () => void {
+	if (!installation) {
+		installation = {
+			handler: suppressingHandler,
+			previous: warningGlobal.AI_SDK_LOG_WARNINGS,
+			hadPrevious: 'AI_SDK_LOG_WARNINGS' in warningGlobal,
+			refs: 0,
+		};
+		warningGlobal.AI_SDK_LOG_WARNINGS = suppressingHandler;
+	}
+	installation.refs += 1;
+	let released = false;
+	return () => {
+		if (released || !installation) return;
+		released = true;
+		installation.refs -= 1;
+		if (installation.refs > 0) return;
+		const current = installation;
+		installation = null;
+		if (warningGlobal.AI_SDK_LOG_WARNINGS !== current.handler) return;
+		if (current.hadPrevious) {
+			warningGlobal.AI_SDK_LOG_WARNINGS = current.previous;
+		} else {
+			delete warningGlobal.AI_SDK_LOG_WARNINGS;
 		}
 	};
 }

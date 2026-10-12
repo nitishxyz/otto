@@ -1,4 +1,4 @@
-import { getDb } from '@ottocode/database';
+import { getDbForConfig } from '@ottocode/database';
 import { loadConfig, logger } from '@ottocode/sdk';
 import {
 	bunWebSocket,
@@ -127,7 +127,7 @@ export async function createServerRuntime(
 	);
 	const cfg = await loadConfig(projectRoot);
 	try {
-		await getDb(cfg.projectRoot);
+		await getDbForConfig(cfg);
 	} catch (error) {
 		throw createProjectStorageError(cfg, error);
 	}

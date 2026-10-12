@@ -1,13 +1,12 @@
 import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
 import { google, createGoogleGenerativeAI } from '@ai-sdk/google';
 import { openai, createOpenAI } from '@ai-sdk/openai';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { createOpenRouterModel } from './openrouter-client.ts';
+import { createOpencodeModel } from './opencode-client.ts';
 import { createOllama } from 'ai-sdk-ollama';
 import type { BuiltInProviderId } from '../../types/src/index.ts';
 import { BUILT_IN_PROVIDER_DESCRIPTORS } from '../../types/src/provider-descriptors.ts';
 import { createBasetenModel } from './baseten-client.ts';
-import { catalog } from './catalog-merged.ts';
 import { createDeepSeekModel } from './deepseek-client.ts';
 import { createHuggingFaceModel } from './huggingface-client.ts';
 import { createMetaModel } from './meta-client.ts';
@@ -24,7 +23,20 @@ export type BuiltInModelFactoryConfig = {
 	apiKey?: string;
 	customFetch?: typeof fetch;
 	baseURL?: string;
+	promptCacheKey?: string;
 };
+
+function providerOverrides(config: BuiltInModelFactoryConfig): {
+	apiKey?: string;
+	baseURL?: string;
+	fetch?: typeof fetch;
+} {
+	return {
+		...(config.apiKey !== undefined ? { apiKey: config.apiKey } : {}),
+		...(config.baseURL ? { baseURL: config.baseURL } : {}),
+		...(config.customFetch ? { fetch: config.customFetch } : {}),
+	};
+}
 
 const SPECIALIZED_RUNTIME_KINDS = new Set([
 	'copilot-oauth',
@@ -46,39 +58,30 @@ export function createBuiltInProviderModel(
 		);
 	}
 
+	const overrides = providerOverrides(config);
+	const hasOverrides = Object.keys(overrides).length > 0;
+
 	switch (descriptor.runtimeKind) {
 		case 'openai': {
-			if (config.customFetch) {
-				const instance = createOpenAI({
-					apiKey: config.apiKey || 'oauth-token',
-					fetch: config.customFetch,
-				});
-				return resolveOpenAIResponsesModel(instance, model);
+			if (!hasOverrides) {
+				return shouldUseOpenAIResponsesApi(model)
+					? openai.responses(model)
+					: openai(model);
 			}
-			if (config.apiKey) {
-				return resolveOpenAIResponsesModel(
-					createOpenAI({ apiKey: config.apiKey }),
-					model,
-				);
-			}
-			return shouldUseOpenAIResponsesApi(model)
-				? openai.responses(model)
-				: openai(model);
+			return resolveOpenAIResponsesModel(
+				createOpenAI({
+					...overrides,
+				}),
+				model,
+			);
 		}
-		case 'anthropic': {
-			if (config.customFetch) {
-				return createAnthropic({
-					apiKey: config.apiKey || '',
-					fetch: config.customFetch,
-				});
-			}
-			if (config.apiKey)
-				return createAnthropic({ apiKey: config.apiKey })(model);
-			return anthropic(model);
-		}
+		case 'anthropic':
+			return hasOverrides
+				? createAnthropic(overrides)(model)
+				: anthropic(model);
 		case 'google':
-			return config.apiKey
-				? createGoogleGenerativeAI({ apiKey: config.apiKey })(model)
+			return hasOverrides
+				? createGoogleGenerativeAI(overrides)(model)
 				: google(model);
 		case 'meta':
 			return createMetaModel(model, {
@@ -93,6 +96,7 @@ export function createBuiltInProviderModel(
 					config.baseURL || descriptor.defaultBaseURL || 'https://ollama.com',
 				),
 				headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+				...(config.customFetch ? { fetch: config.customFetch } : {}),
 			})(model);
 		}
 		case 'baseten':
@@ -114,11 +118,19 @@ export function createBuiltInProviderModel(
 				fetch: config.customFetch,
 			});
 		case 'openrouter':
-			return createOpenRouter({
-				apiKey: config.apiKey || process.env.OPENROUTER_API_KEY || '',
-			}).chat(model);
+			return createOpenRouterModel(model, {
+				apiKey: config.apiKey,
+				baseURL: config.baseURL,
+				fetch: config.customFetch,
+				promptCacheKey: config.promptCacheKey,
+			});
 		case 'opencode':
-			return createOpencodeRuntimeModel(model, config);
+			return createOpencodeModel(model, {
+				apiKey: config.apiKey,
+				baseURL: config.baseURL,
+				fetch: config.customFetch,
+				promptCacheKey: config.promptCacheKey,
+			});
 		case 'zai':
 			return createZaiModel(model, {
 				apiKey: config.apiKey,
@@ -141,62 +153,11 @@ export function createBuiltInProviderModel(
 			return createMinimaxModel(model, {
 				apiKey: config.apiKey,
 				baseURL: config.baseURL,
+				fetch: config.customFetch,
 			});
 		default:
 			throw new Error(
 				`Unsupported provider runtime: ${descriptor.runtimeKind}`,
 			);
 	}
-}
-
-function createOpencodeRuntimeModel(
-	model: string,
-	config: BuiltInModelFactoryConfig,
-) {
-	const entry = catalog.opencode;
-	const prefix = 'opencode/';
-	const normalizedModel = model.startsWith(prefix)
-		? model.slice(prefix.length)
-		: model;
-	const modelInfo = entry?.models[normalizedModel] ?? entry?.models[model];
-	const resolvedModelId = modelInfo?.id ?? normalizedModel;
-	const binding = modelInfo?.provider?.npm ?? entry?.npm;
-	const apiKey = config.apiKey || process.env.OPENCODE_API_KEY || '';
-	const baseURL =
-		config.baseURL ||
-		modelInfo?.provider?.baseURL ||
-		modelInfo?.provider?.api ||
-		BUILT_IN_PROVIDER_DESCRIPTORS.opencode.defaultBaseURL;
-	const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
-
-	if (binding === '@ai-sdk/openai') {
-		return createOpenAI({ apiKey, baseURL })(resolvedModelId);
-	}
-	if (binding === '@ai-sdk/anthropic') {
-		return createAnthropic({ apiKey, baseURL })(resolvedModelId);
-	}
-	if (binding === '@ai-sdk/openai-compatible') {
-		return createOpenAICompatible({
-			name: entry?.label ?? 'opencode',
-			baseURL,
-			headers,
-		})(resolvedModelId);
-	}
-
-	const id = resolvedModelId.toLowerCase();
-	if (id.includes('claude')) {
-		return createAnthropic({ apiKey, baseURL })(resolvedModelId);
-	}
-	if (
-		id.includes('qwen3-coder') ||
-		id.includes('grok-code') ||
-		id.includes('kimi-k2')
-	) {
-		return createOpenAICompatible({
-			name: entry?.label ?? 'opencode',
-			baseURL,
-			headers,
-		})(resolvedModelId);
-	}
-	return createOpenAI({ apiKey, baseURL })(resolvedModelId);
 }

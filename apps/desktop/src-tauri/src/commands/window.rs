@@ -8,6 +8,13 @@ static WINDOW_COUNTER: AtomicU32 = AtomicU32::new(1);
 
 #[tauri::command]
 pub async fn create_new_window(app: AppHandle) -> Result<(), String> {
+    create_window(&app, |_| {}).map(|_| ())
+}
+
+pub(crate) fn create_window(
+    app: &AppHandle,
+    before_build: impl FnOnce(&str),
+) -> Result<String, String> {
     let count = WINDOW_COUNTER.fetch_add(1, Ordering::SeqCst);
     let label = format!("main-{}", count);
 
@@ -18,17 +25,18 @@ pub async fn create_new_window(app: AppHandle) -> Result<(), String> {
         .first()
         .cloned()
         .ok_or_else(|| "missing primary window config".to_string())?;
-    window_config.label = label;
+    window_config.label = label.clone();
 
-    let builder = WebviewWindowBuilder::from_config(&app, &window_config)
+    let builder = WebviewWindowBuilder::from_config(app, &window_config)
         .map_err(|e: tauri::Error| e.to_string())?;
 
     #[cfg(target_os = "linux")]
     let builder = builder.decorations(false);
 
+    before_build(&label);
     builder.build().map_err(|e: tauri::Error| e.to_string())?;
 
-    Ok(())
+    Ok(label)
 }
 
 fn machine_window_label(machine_id: &str) -> String {

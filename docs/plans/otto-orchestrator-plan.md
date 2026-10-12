@@ -1,5 +1,7 @@
 # Otto Orchestrator Plan
 
+> **Superseded (October 2026):** goal routes and the built-in orchestrator were removed (`tests/backend-orchestration-removal.test.ts`). Current direction is tracked in [harness-reliability-roadmap.md](harness-reliability-roadmap.md).
+
 Status: mostly implemented (June 2026), with explicit legacy/compatibility
 paths still present. Kept for reference alongside [otto.md](otto.md)
 (superseded by this design).

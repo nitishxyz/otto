@@ -1,7 +1,5 @@
-import {
-	createOttoRouter,
-	type OttoRouterPaymentCallbacks,
-} from '@ottocode/sdk';
+import type { OttoRouterPaymentCallbacks } from '@ottocode/sdk';
+import { createProviderModel } from '@ottocode/sdk/providers';
 import { devToolsMiddleware } from '@ai-sdk/devtools';
 import { getOttoRouterOAuthAuth } from '../../routes/ottorouter/service.ts';
 import { isDevtoolsEnabled } from '../debug/state.ts';
@@ -17,6 +15,7 @@ const MIN_TOPUP_USD = 5;
 export interface ResolveOttoRouterModelOptions {
 	messageId?: string;
 	projectRoot?: string;
+	baseURL?: string;
 	topupApprovalMode?: 'auto' | 'approval';
 	autoPayThresholdUsd?: number;
 }
@@ -32,7 +31,7 @@ export async function resolveOttoRouterModel(
 			'OttoRouter provider requires OAuth. Run `otto auth login ottorouter` first.',
 		);
 	}
-	const baseURL = process.env.OTTOROUTER_BASE_URL;
+	const baseURL = options.baseURL || process.env.OTTOROUTER_BASE_URL;
 	const {
 		messageId,
 		topupApprovalMode = 'approval',
@@ -73,7 +72,7 @@ export async function resolveOttoRouterModel(
 					publish({
 						type: 'ottorouter.balance.updated',
 						sessionId,
-						payload: update,
+						payload: { ...update },
 					});
 				},
 				onPaymentApproval: async (info): Promise<TopupMethod | 'cancel'> => {
@@ -104,20 +103,16 @@ export async function resolveOttoRouterModel(
 			}
 		: {};
 
-	const ottorouter = createOttoRouter({
-		auth,
+	return createProviderModel('ottorouter', model, {
+		ottorouterAuth: auth,
 		baseURL,
-		fetch: providerFetch,
-		callbacks,
-		middleware: isDevtoolsEnabled() ? devToolsMiddleware() : undefined,
-		cache: {
-			promptCacheKey: sessionId,
-		},
-		payment: {
+		customFetch: providerFetch,
+		sessionId,
+		ottorouterOptions: {
+			callbacks,
+			middleware: isDevtoolsEnabled() ? devToolsMiddleware() : undefined,
 			topupApprovalMode,
 			autoPayThresholdUsd,
 		},
 	});
-
-	return ottorouter.model(model);
 }

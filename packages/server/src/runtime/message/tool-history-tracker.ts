@@ -1,11 +1,4 @@
-type ToolResultPart = {
-	type: string;
-	state?: string;
-	toolCallId?: string;
-	input?: unknown;
-	output?: unknown;
-	[key: string]: unknown;
-};
+import type { MessagePartRow } from './history/types.ts';
 
 type ToolResultInfo = {
 	toolName: string;
@@ -19,46 +12,80 @@ type TargetDescriptor = {
 	summary: string;
 };
 
-type TrackedPart = {
-	part: ToolResultPart;
-	summary: string;
-	summarized: boolean;
-};
+/**
+ * How an earlier tool result superseded by a later one is shown to the model.
+ * Reads keep their metadata with a compaction reason; other tools are
+ * replaced by a one-line summary.
+ */
+export type ToolSupersession =
+	| { kind: 'read'; compactedReason: string }
+	| { kind: 'summary'; summary: string };
 
+export const READ_SUPERSEDED_REASON =
+	'Superseded by a later read of the same file and line range.';
+
+function parseContent(part: MessagePartRow): Record<string, unknown> | null {
+	try {
+		return getRecord(JSON.parse(part.content ?? '{}'));
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Computes tool-result supersession over stored parts before they are
+ * converted to model messages. Parts must be in chronological order; a later
+ * result for the same target supersedes every earlier one.
+ */
 export class ToolHistoryTracker {
-	private readonly targets = new Map<string, TrackedPart>();
+	private readonly superseded = new Map<string, ToolSupersession>();
 
-	register(part: ToolResultPart, info: ToolResultInfo) {
-		const descriptor = describeToolResult(info);
-		if (!descriptor) return;
-
-		const entry: TrackedPart = {
-			part,
-			summary: descriptor.summary,
-			summarized: false,
-		};
-
-		for (const key of descriptor.keys) {
-			const previous = this.targets.get(key);
-			if (previous && previous.part !== part) {
-				this.applySummary(previous);
+	static fromParts(parts: MessagePartRow[]): ToolHistoryTracker {
+		const tracker = new ToolHistoryTracker();
+		const callArgs = new Map<string, unknown>();
+		const latestByKey = new Map<
+			string,
+			{ callId: string; supersession: ToolSupersession }
+		>();
+		for (const part of parts) {
+			if (part.compactedAt) continue;
+			const content = parseContent(part);
+			if (!content) continue;
+			const callId = getString(content.callId);
+			if (!callId) continue;
+			if (part.type === 'tool_call') {
+				callArgs.set(callId, content.args);
+				continue;
 			}
-			this.targets.set(key, entry);
+			if (part.type !== 'tool_result') continue;
+			const toolName = getString(content.name) ?? part.toolName;
+			if (!toolName) continue;
+			const info: ToolResultInfo = {
+				toolName,
+				callId,
+				args: callArgs.get(callId) ?? content.args,
+				result: content.result,
+			};
+			const descriptor = describeToolResult(info);
+			if (!descriptor) continue;
+			const supersession: ToolSupersession =
+				toolName === 'read'
+					? { kind: 'read', compactedReason: READ_SUPERSEDED_REASON }
+					: { kind: 'summary', summary: descriptor.summary };
+			for (const key of descriptor.keys) {
+				const previous = latestByKey.get(key);
+				if (previous && previous.callId !== callId) {
+					tracker.superseded.set(previous.callId, previous.supersession);
+				}
+				latestByKey.set(key, { callId, supersession });
+			}
 		}
+		return tracker;
 	}
 
-	private applySummary(entry: TrackedPart) {
-		if (entry.summarized) return;
-		// Keep this entry as a tool result so the history still produces tool_result blocks.
-		entry.part.state = 'output-available';
-		entry.part.output = entry.summary;
-		(entry.part as { summaryText?: string }).summaryText = entry.summary;
-		delete (entry.part as { errorText?: unknown }).errorText;
-		delete (entry.part as { rawInput?: unknown }).rawInput;
-		delete (entry.part as { callProviderMetadata?: unknown })
-			.callProviderMetadata;
-		delete (entry.part as { providerMetadata?: unknown }).providerMetadata;
-		entry.summarized = true;
+	/** Supersession for a tool call id, if a later result replaced it. */
+	get(callId: string): ToolSupersession | undefined {
+		return this.superseded.get(callId);
 	}
 }
 
@@ -83,11 +110,14 @@ function describeToolResult(info: ToolResultInfo): TargetDescriptor | null {
 
 function describeRead(info: ToolResultInfo): TargetDescriptor | null {
 	const args = getRecord(info.args);
-	if (!args) return null;
-	const path = getString(args.path);
+	const result = getRecord(info.result);
+	// Failed reads neither supersede nor get superseded.
+	if (result?.ok === false) return null;
+	const path = getString(result?.path) ?? getString(args?.path);
 	if (!path) return null;
-	const startLine = getNumber(args.startLine);
-	const endLine = getNumber(args.endLine);
+	const startLine = getNumber(args?.startLine);
+	const endLine = getNumber(args?.endLine);
+	const maxLines = getNumber(args?.maxLines);
 
 	let rangeLabel = 'entire file';
 	let rangeKey = 'all';
@@ -96,6 +126,10 @@ function describeRead(info: ToolResultInfo): TargetDescriptor | null {
 		const end = endLine ?? 'end';
 		rangeLabel = `lines ${start}–${end}`;
 		rangeKey = `${start}-${end}`;
+	}
+	if (maxLines !== undefined) {
+		rangeLabel = `${rangeLabel}, max ${maxLines} lines`;
+		rangeKey = `${rangeKey}:max${maxLines}`;
 	}
 
 	const key = `read:${normalizePath(path)}:${rangeKey}`;

@@ -1,5 +1,6 @@
 import { MCPServerManager } from './server-manager.ts';
 import { loadEffectiveMCPConfig } from './effective-config.ts';
+import { clearMCPToolClassifications } from './classification-registry.ts';
 import type { MCPConfig, MCPServerConfig, MCPScope } from './types.ts';
 import { getGlobalConfigDir } from '../../../config/src/paths.ts';
 import { promises as fs } from 'node:fs';
@@ -7,13 +8,42 @@ import { join } from 'node:path';
 
 const legacyMCPManagerKey = 'legacy';
 const mcpManagersByProject = new Map<string, MCPServerManager>();
-const pendingMCPManagersByProject = new Map<
-	string,
-	Promise<MCPServerManager>
->();
+/** Tail of the per-key lifecycle queue; every mutation runs serialized. */
+const lifecycleQueues = new Map<string, Promise<unknown>>();
+/** Monotonic per-key generation; bumps whenever the live manager changes. */
+const managerGenerations = new Map<string, number>();
 
 function getMCPManagerKey(projectRoot?: string): string {
 	return projectRoot || legacyMCPManagerKey;
+}
+
+function serializeLifecycle<T>(
+	key: string,
+	task: () => Promise<T>,
+): Promise<T> {
+	const previous = lifecycleQueues.get(key) ?? Promise.resolve();
+	const run = previous.catch(() => {}).then(task);
+	const tail = run.catch(() => {});
+	lifecycleQueues.set(key, tail);
+	void tail.then(() => {
+		if (lifecycleQueues.get(key) === tail) lifecycleQueues.delete(key);
+	});
+	return run;
+}
+
+function bumpGeneration(key: string): number {
+	const next = (managerGenerations.get(key) ?? 0) + 1;
+	managerGenerations.set(key, next);
+	return next;
+}
+
+/**
+ * Generation of a project's MCP manager state. Changes whenever a manager is
+ * created, replaced, reconciled, or shut down; tool snapshots taken at an older
+ * generation are stale.
+ */
+export function getMCPManagerGeneration(projectRoot?: string): number {
+	return managerGenerations.get(getMCPManagerKey(projectRoot)) ?? 0;
 }
 
 export function getMCPManager(projectRoot?: string): MCPServerManager | null {
@@ -34,25 +64,14 @@ export async function ensureMCPManager(
 ): Promise<MCPServerManager> {
 	const existing = getMCPManager(projectRoot);
 	if (existing) return existing;
-	const managerKey = getMCPManagerKey(projectRoot);
-	const pending = pendingMCPManagersByProject.get(managerKey);
-	if (pending) return pending;
-	const initialization = (async () => {
+	return serializeLifecycle(getMCPManagerKey(projectRoot), async () => {
 		const current = getMCPManager(projectRoot);
 		if (current) return current;
-		return initializeMCP(
+		return initializeMCPUnlocked(
 			await loadEffectiveMCPConfig(projectRoot, globalConfigDir),
 			projectRoot,
 		);
-	})();
-	pendingMCPManagersByProject.set(managerKey, initialization);
-	try {
-		return await initialization;
-	} finally {
-		if (pendingMCPManagersByProject.get(managerKey) === initialization) {
-			pendingMCPManagersByProject.delete(managerKey);
-		}
-	}
+	});
 }
 
 /** Reloads a project's manager from persisted effective MCP configuration. */
@@ -60,13 +79,11 @@ export async function reloadMCPManager(
 	projectRoot: string,
 	globalConfigDir = getGlobalConfigDir(),
 ): Promise<MCPServerManager> {
-	const pending = pendingMCPManagersByProject.get(
-		getMCPManagerKey(projectRoot),
-	);
-	if (pending) await pending;
-	return initializeMCP(
-		await loadEffectiveMCPConfig(projectRoot, globalConfigDir),
-		projectRoot,
+	return serializeLifecycle(getMCPManagerKey(projectRoot), async () =>
+		initializeMCPUnlocked(
+			await loadEffectiveMCPConfig(projectRoot, globalConfigDir),
+			projectRoot,
+		),
 	);
 }
 
@@ -74,36 +91,120 @@ export async function initializeMCP(
 	config: MCPConfig,
 	projectRoot?: string,
 ): Promise<MCPServerManager> {
+	return serializeLifecycle(getMCPManagerKey(projectRoot), () =>
+		initializeMCPUnlocked(config, projectRoot),
+	);
+}
+
+async function initializeMCPUnlocked(
+	config: MCPConfig,
+	projectRoot?: string,
+): Promise<MCPServerManager> {
 	const managerKey = getMCPManagerKey(projectRoot);
 	const existingManager = mcpManagersByProject.get(managerKey);
 	if (existingManager) {
+		mcpManagersByProject.delete(managerKey);
 		await existingManager.stopAll();
 	}
+	bumpGeneration(managerKey);
 	const manager = new MCPServerManager();
 	if (projectRoot) {
 		manager.setProjectRoot(projectRoot);
 	}
 	await manager.startServers(config.servers);
 	mcpManagersByProject.set(managerKey, manager);
+	bumpGeneration(managerKey);
 	return manager;
+}
+
+function serverConfigSignature(config: MCPServerConfig): string {
+	const { source: _source, ...rest } = config;
+	return stableStringify(rest);
+}
+
+function stableStringify(value: unknown): string {
+	if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+	if (value && typeof value === 'object') {
+		return `{${Object.entries(value as Record<string, unknown>)
+			.filter(([, item]) => item !== undefined)
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+			.join(',')}}`;
+	}
+	return JSON.stringify(value) ?? 'null';
+}
+
+/**
+ * Reconciles live MCP managers with the persisted effective configuration
+ * (plugin defaults merged with user overrides). Stops servers that are gone
+ * or disabled, starts new ones, and restarts changed ones without touching
+ * unchanged servers. With no projectRoot, every active project is reconciled.
+ */
+export async function reconcileMCPManagers(
+	projectRoot?: string,
+	globalConfigDir = getGlobalConfigDir(),
+): Promise<void> {
+	const roots = projectRoot ? [projectRoot] : getActiveMCPProjectRoots();
+	await Promise.all(
+		roots.map((root) =>
+			serializeLifecycle(getMCPManagerKey(root), async () => {
+				const manager = getMCPManager(root);
+				if (!manager) return;
+				const config = await loadEffectiveMCPConfig(root, globalConfigDir);
+				const desired = new Map(
+					config.servers
+						.filter((server) => server.disabled === false)
+						.map((server) => [server.name, server]),
+				);
+				let changed = false;
+				for (const name of manager.getServerNames()) {
+					const next = desired.get(name);
+					const current = manager.getServerConfig(name);
+					if (
+						next &&
+						current &&
+						serverConfigSignature(next) === serverConfigSignature(current)
+					) {
+						desired.delete(name);
+						continue;
+					}
+					await manager.stopServer(name);
+					changed = true;
+				}
+				for (const server of desired.values()) {
+					await manager.restartServer(server);
+					changed = true;
+				}
+				if (changed) {
+					bumpGeneration(getMCPManagerKey(root));
+					clearMCPToolClassifications(root);
+				}
+			}),
+		),
+	);
 }
 
 export async function shutdownMCP(projectRoot?: string): Promise<void> {
 	if (projectRoot) {
-		const managerKey = getMCPManagerKey(projectRoot);
-		await pendingMCPManagersByProject.get(managerKey)?.catch(() => {});
-		const manager = mcpManagersByProject.get(managerKey);
-		if (!manager) return;
-		await manager.stopAll();
-		mcpManagersByProject.delete(managerKey);
+		await shutdownKey(getMCPManagerKey(projectRoot));
 		return;
 	}
 
-	await Promise.allSettled(pendingMCPManagersByProject.values());
-	for (const [managerKey, manager] of mcpManagersByProject) {
-		await manager.stopAll();
+	const keys = new Set([
+		...mcpManagersByProject.keys(),
+		...lifecycleQueues.keys(),
+	]);
+	await Promise.all(Array.from(keys, (key) => shutdownKey(key)));
+}
+
+function shutdownKey(managerKey: string): Promise<void> {
+	return serializeLifecycle(managerKey, async () => {
+		const manager = mcpManagersByProject.get(managerKey);
+		if (!manager) return;
 		mcpManagersByProject.delete(managerKey);
-	}
+		bumpGeneration(managerKey);
+		await manager.stopAll();
+	});
 }
 
 export async function loadMCPConfig(

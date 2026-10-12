@@ -1,4 +1,5 @@
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { accessSync, constants } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, delimiter, join } from 'node:path';
@@ -11,10 +12,8 @@ import { fileExists, isExecutable } from './bin-manager/filesystem.ts';
 import { getAgiBinDir, getBinaryFileName } from './bin-manager/paths.ts';
 import { extractFromVendor } from './bin-manager/vendor.ts';
 
-let cachedLoginPath: {
-	key: string;
-	path: string | null;
-} | null = null;
+const execFileAsync = promisify(execFile);
+const loginEnvFlights = new Map<string, Promise<NodeJS.ProcessEnv | null>>();
 
 let cachedLoginEnv: {
 	key: string;
@@ -141,22 +140,16 @@ export function getShellExecutionConfig(
 	};
 }
 
-/** Return the user's cached login-shell environment with a portable PATH. */
+/** Return the current environment snapshot; await getShellEnvironmentAsync for first-use discovery. */
 export function getShellEnvironment(
 	options: { envMode?: ShellEnvModeInput } = {},
 ): Record<string, string> {
 	const envMode = normalizeShellEnvMode(options.envMode);
-	const loginEnv =
-		envMode === 'minimal' ? null : getLoginShellEnv(envMode === 'login-fresh');
+	const loginEnv = envMode === 'minimal' ? null : getLoginShellEnv();
 	const values: NodeJS.ProcessEnv = {
 		...process.env,
 		...(loginEnv ?? {}),
-		PATH: mergePaths([
-			getAgiBinDir(),
-			loginEnv?.PATH,
-			getLoginShellPath(),
-			process.env.PATH,
-		]),
+		PATH: getAugmentedPath(),
 	};
 	return Object.fromEntries(
 		Object.entries(values).filter(
@@ -170,96 +163,95 @@ function normalizeShellEnvMode(envMode?: ShellEnvModeInput): ShellEnvMode {
 	return envMode ?? 'login-cache';
 }
 
-function getLoginShellEnv(refresh: boolean): NodeJS.ProcessEnv | null {
-	const home = process.env.HOME || homedir();
-	const userShell = getUserShell();
-	const cacheKey = [home, userShell, process.env.PATH || ''].join('\0');
-	if (!refresh && cachedLoginEnv?.key === cacheKey) return cachedLoginEnv.env;
-
-	if (process.platform === 'win32') {
-		cachedLoginEnv = { key: cacheKey, env: { ...process.env } };
-		return cachedLoginEnv.env;
-	}
-	try {
-		const output = execFileSync(
-			userShell,
-			[
-				'-ic',
-				`printf '%s\n' ${JSON.stringify(ENV_JSON_START)}; env; printf '%s\n' ${JSON.stringify(ENV_JSON_END)}`,
-			],
-			{
-				timeout: 10000,
-				stdio: ['ignore', 'pipe', 'ignore'],
-				env: {
-					...process.env,
-					HOME: home,
-					USER: process.env.USER || '',
-					SHELL: userShell,
-				},
-			},
-		).toString();
-		const start = output.indexOf(ENV_JSON_START);
-		const end = output.indexOf(ENV_JSON_END, start + ENV_JSON_START.length);
-		if (start >= 0 && end > start) {
-			const env: NodeJS.ProcessEnv = {};
-			const body = output.slice(start + ENV_JSON_START.length, end).trim();
-			for (const line of body.split('\n')) {
-				const separator = line.indexOf('=');
-				if (separator <= 0) continue;
-				env[line.slice(0, separator)] = line.slice(separator + 1);
-			}
-			cachedLoginEnv = { key: cacheKey, env };
-			return env;
-		}
-	} catch {}
-	return null;
+function shellEnvironmentKey(): string {
+	return [
+		process.env.HOME || homedir(),
+		getUserShell(),
+		process.env.PATH || '',
+	].join('\0');
 }
 
-function getLoginShellPath(): string | null {
-	const home = process.env.HOME || homedir();
-	const userShell = getUserShell();
-	const cacheKey = [home, userShell, process.env.PATH || ''].join('\0');
-	if (cachedLoginPath?.key === cacheKey) return cachedLoginPath.path;
+function getLoginShellEnv(): NodeJS.ProcessEnv | null {
+	const key = shellEnvironmentKey();
+	return cachedLoginEnv?.key === key ? cachedLoginEnv.env : null;
+}
 
-	if (process.platform === 'win32') {
-		cachedLoginPath = { key: cacheKey, path: process.env.PATH || '' };
-		return cachedLoginPath.path;
-	}
-
-	const shellCandidates = [
-		process.env.SHELL,
-		'/bin/zsh',
-		'/bin/bash',
-		'/bin/sh',
-	].filter(Boolean) as string[];
-
-	for (const shell of shellCandidates) {
+function discoverLoginShellEnv(
+	refresh: boolean,
+): Promise<NodeJS.ProcessEnv | null> {
+	const key = shellEnvironmentKey();
+	const existing = loginEnvFlights.get(key);
+	if (existing) return existing;
+	if (!refresh && cachedLoginEnv?.key === key)
+		return Promise.resolve(cachedLoginEnv.env);
+	const pending = (async () => {
+		let env: NodeJS.ProcessEnv | null = null;
 		try {
-			const result = execFileSync(shell, ['-lc', 'echo "___PATH___:$PATH"'], {
-				timeout: 1500,
-				stdio: ['ignore', 'pipe', 'ignore'],
-				env: {
-					...process.env,
-					HOME: home,
-					USER: process.env.USER || '',
-					SHELL: shell,
-				},
-			});
-			const output = result.toString();
-			const match = output.match(/___PATH___:(.*)/);
-			if (match?.[1]?.trim()) {
-				cachedLoginPath = { key: cacheKey, path: match[1].trim() };
-				return cachedLoginPath.path;
+			if (process.platform === 'win32') env = { ...process.env };
+			else {
+				const { stdout } = await execFileAsync(
+					getUserShell(),
+					[
+						'-ic',
+						`printf '%s\\n' ${JSON.stringify(ENV_JSON_START)}; env; printf '%s\\n' ${JSON.stringify(ENV_JSON_END)}`,
+					],
+					{
+						timeout: 10000,
+						maxBuffer: 512 * 1024,
+						env: { ...process.env, HOME: process.env.HOME || homedir() },
+					},
+				);
+				const start = stdout.indexOf(ENV_JSON_START);
+				const end = stdout.indexOf(ENV_JSON_END, start + ENV_JSON_START.length);
+				if (start >= 0 && end > start) {
+					env = {};
+					for (const line of stdout
+						.slice(start + ENV_JSON_START.length, end)
+						.trim()
+						.split('\n')) {
+						const separator = line.indexOf('=');
+						if (separator > 0)
+							env[line.slice(0, separator)] = line.slice(separator + 1);
+					}
+				}
 			}
 		} catch {}
-	}
+		cachedLoginEnv = { key, env };
+		return env;
+	})().finally(() => loginEnvFlights.delete(key));
+	loginEnvFlights.set(key, pending);
+	return pending;
+}
 
-	cachedLoginPath = { key: cacheKey, path: null };
-	return null;
+/** Await single-flight login discovery before constructing the portable environment. */
+export async function getShellEnvironmentAsync(
+	options: { envMode?: ShellEnvModeInput } = {},
+): Promise<Record<string, string>> {
+	const mode = normalizeShellEnvMode(options.envMode);
+	if (mode !== 'minimal') await discoverLoginShellEnv(mode === 'login-fresh');
+	return getShellEnvironment({
+		envMode: mode === 'login-fresh' ? 'login-cache' : mode,
+	});
+}
+
+/** Await memoized discovery; synchronous APIs use the current snapshot without blocking. */
+export async function getShellExecutionConfigAsync(
+	cmd: string,
+	options: { envMode?: ShellEnvModeInput } = {},
+): Promise<ReturnType<typeof getShellExecutionConfig>> {
+	const mode = normalizeShellEnvMode(options.envMode);
+	if (mode !== 'minimal') await discoverLoginShellEnv(mode === 'login-fresh');
+	return getShellExecutionConfig(cmd, {
+		envMode: mode === 'login-fresh' ? 'login-cache' : mode,
+	});
 }
 
 export function getAugmentedPath(): string {
-	return mergePaths([getAgiBinDir(), getLoginShellPath(), process.env.PATH]);
+	return mergePaths([
+		getAgiBinDir(),
+		getLoginShellEnv()?.PATH,
+		process.env.PATH,
+	]);
 }
 
 function mergePaths(paths: Array<string | null | undefined>): string {

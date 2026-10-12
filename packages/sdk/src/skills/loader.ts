@@ -9,8 +9,21 @@ import type {
 	SkillFileInfo,
 } from './types.ts';
 import { getGlobalConfigDir, getHomeDir } from '../config/src/paths.ts';
+import { listSuppressedPluginSkillDirs } from '../plugins/skills.ts';
 
-const skillCache = new Map<string, SkillDefinition>();
+export type SkillRegistry = ReadonlyMap<string, SkillDefinition>;
+const registries = new WeakMap<DiscoveredSkill[], SkillRegistry>();
+const registryLists = new WeakMap<SkillRegistry, DiscoveredSkill[]>();
+
+export function getRegistrySkills(registry = skillCache): DiscoveredSkill[] {
+	return registryLists.get(registry) ?? [];
+}
+let skillCache: SkillRegistry = new Map();
+
+/** A discovery result owns its definitions; the latest result is a legacy default only. */
+export function getSkillRegistry(skills?: DiscoveredSkill[]): SkillRegistry {
+	return skills ? (registries.get(skills) ?? new Map()) : skillCache;
+}
 
 const ALLOWED_EXTENSIONS = new Set([
 	'.md',
@@ -43,6 +56,11 @@ export async function discoverSkills(
 ): Promise<DiscoveredSkill[]> {
 	const skills = new Map<string, SkillDefinition>();
 	const home = getHomeDir();
+	const suppressed = await Promise.all(
+		(await listSuppressedPluginSkillDirs(cwd)).map(async (dir) =>
+			fs.realpath(dir).catch(() => resolve(dir)),
+		),
+	);
 
 	const globalDirs = [
 		join(getGlobalConfigDir(), 'skills'),
@@ -51,17 +69,7 @@ export async function discoverSkills(
 		join(home, '.codex/skills'),
 	];
 	for (const dir of globalDirs) {
-		await loadSkillsFromDir(dir, 'user', skills);
-	}
-
-	const projectDirs = [
-		join(cwd, '.otto/skills'),
-		join(cwd, '.agents/skills'),
-		join(cwd, '.claude/skills'),
-		join(cwd, '.codex/skills'),
-	];
-	for (const dir of projectDirs) {
-		await loadSkillsFromDir(dir, 'cwd', skills);
+		await loadSkillsFromDir(dir, 'user', skills, suppressed);
 	}
 
 	if (repoRoot && repoRoot !== cwd) {
@@ -76,28 +84,69 @@ export async function discoverSkills(
 		}
 	}
 
-	skillCache.clear();
-	for (const [name, def] of skills) {
-		skillCache.set(name, def);
+	// Higher scopes overwrite lower scopes: cwd > repo > user.
+	for (const dir of [
+		'.otto/skills',
+		'.agents/skills',
+		'.claude/skills',
+		'.codex/skills',
+	]) {
+		await loadSkillsFromDir(join(cwd, dir), 'cwd', skills);
 	}
-
-	return Array.from(skills.values()).map((s) => ({
+	for (const def of skills.values()) {
+		Object.freeze(def.metadata.allowedTools);
+		Object.freeze(def.metadata.metadata);
+		Object.freeze(def.metadata);
+		Object.freeze(def);
+	}
+	const registry: SkillRegistry = Object.freeze({
+		get size() {
+			return skills.size;
+		},
+		get: skills.get.bind(skills),
+		has: skills.has.bind(skills),
+		entries: skills.entries.bind(skills),
+		keys: skills.keys.bind(skills),
+		values: skills.values.bind(skills),
+		forEach(
+			callback: (
+				value: SkillDefinition,
+				key: string,
+				map: SkillRegistry,
+			) => void,
+			thisArg?: unknown,
+		) {
+			for (const [name, skill] of skills)
+				callback.call(thisArg, skill, name, registry);
+		},
+		[Symbol.iterator]: skills[Symbol.iterator].bind(skills),
+	});
+	skillCache = registry;
+	const discovered = Array.from(skills.values()).map((s) => ({
 		name: s.metadata.name,
 		description: s.metadata.description,
 		path: s.path,
 		scope: s.scope,
 	}));
+	registries.set(discovered, registry);
+	registryLists.set(registry, discovered);
+	return discovered;
 }
 
-export async function loadSkill(name: string): Promise<SkillDefinition | null> {
-	return skillCache.get(name) ?? null;
+export async function loadSkill(
+	name: string,
+	source: SkillRegistry | DiscoveredSkill[] = skillCache,
+): Promise<SkillDefinition | null> {
+	const registry = Array.isArray(source) ? getSkillRegistry(source) : source;
+	return registry.get(name) ?? null;
 }
 
 export async function loadSkillFile(
 	name: string,
 	filePath: string,
+	registry = skillCache,
 ): Promise<{ content: string; resolvedPath: string } | null> {
-	const skill = skillCache.get(name);
+	const skill = registry.get(name);
 	if (!skill) return null;
 
 	const skillDir = resolve(dirname(skill.path));
@@ -113,12 +162,15 @@ export async function loadSkillFile(
 	}
 
 	try {
-		const stat = await fs.stat(resolved);
+		const canonicalDir = await fs.realpath(skillDir);
+		const canonicalFile = await fs.realpath(resolved);
+		if (!canonicalFile.startsWith(`${canonicalDir}${sep}`)) return null;
+		const stat = await fs.stat(canonicalFile);
 		if (stat.size > MAX_FILE_SIZE) {
 			return null;
 		}
-		const content = await fs.readFile(resolved, 'utf-8');
-		return { content, resolvedPath: resolved };
+		const content = await fs.readFile(canonicalFile, 'utf-8');
+		return { content, resolvedPath: canonicalFile };
 	} catch {
 		return null;
 	}
@@ -126,8 +178,10 @@ export async function loadSkillFile(
 
 export async function discoverSkillFiles(
 	name: string,
+	source: SkillRegistry | DiscoveredSkill[] = skillCache,
 ): Promise<SkillFileInfo[]> {
-	const skill = skillCache.get(name);
+	const registry = Array.isArray(source) ? getSkillRegistry(source) : source;
+	const skill = registry.get(name);
 	if (!skill) return [];
 
 	const skillDir = dirname(skill.path);
@@ -145,7 +199,9 @@ export async function discoverSkillFiles(
 			if (!ALLOWED_EXTENSIONS.has(ext)) continue;
 
 			try {
-				const stat = await fs.stat(join(skillDir, f));
+				const file = await loadSkillFile(name, f, registry);
+				if (!file) continue;
+				const stat = await fs.stat(file.resolvedPath);
 				results.push({ relativePath: f, size: stat.size });
 			} catch {}
 		}
@@ -156,17 +212,18 @@ export async function discoverSkillFiles(
 }
 
 export function getSkillCache(): Map<string, SkillDefinition> {
-	return skillCache;
+	return new Map(skillCache);
 }
 
 export function clearSkillCache(): void {
-	skillCache.clear();
+	skillCache = new Map();
 }
 
 async function loadSkillsFromDir(
 	dir: string,
 	scope: SkillScope,
 	skills: Map<string, SkillDefinition>,
+	suppressed: readonly string[] = [],
 ): Promise<void> {
 	try {
 		await fs.access(dir);
@@ -184,6 +241,15 @@ async function loadSkillsFromDir(
 
 	for (const filePath of files) {
 		try {
+			if (suppressed.length) {
+				const canonical = await fs.realpath(filePath);
+				if (
+					suppressed.some(
+						(dir) => canonical === dir || canonical.startsWith(`${dir}${sep}`),
+					)
+				)
+					continue;
+			}
 			const content = await fs.readFile(filePath, 'utf-8');
 			const skill = parseSkillFile(content, filePath, scope);
 

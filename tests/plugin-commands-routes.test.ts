@@ -9,18 +9,28 @@ import {
 	createServerTerminalBridge,
 	runPluginCommand,
 } from '../packages/server/src/runtime/plugins/commands/index.ts';
+import { getProjectManager } from '../packages/server/src/runtime/projects/manager.ts';
 
 describe('plugin command routes', () => {
 	let projectRoot: string;
+	let previousHome: string | undefined;
 	let previousXdgConfigHome: string | undefined;
 
 	beforeEach(async () => {
 		projectRoot = await mkdtemp(join(tmpdir(), 'otto-plugin-command-routes-'));
+		previousHome = process.env.HOME;
 		previousXdgConfigHome = process.env.XDG_CONFIG_HOME;
+		process.env.HOME = projectRoot;
 		process.env.XDG_CONFIG_HOME = join(projectRoot, 'xdg-config');
 	});
 
 	afterEach(async () => {
+		await getProjectManager().closeAllProjects();
+		if (previousHome === undefined) {
+			delete process.env.HOME;
+		} else {
+			process.env.HOME = previousHome;
+		}
 		if (previousXdgConfigHome === undefined) {
 			delete process.env.XDG_CONFIG_HOME;
 		} else {
@@ -157,22 +167,34 @@ describe('plugin command routes', () => {
 			{
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					project: projectRoot,
-					argsText: '',
-				}),
+				body: JSON.stringify({ project: projectRoot, argsText: '' }),
 			},
 		);
 		const body = await response.json();
+		const runtime = await getProjectManager().getProject({ path: projectRoot });
+		const terminal = runtime.terminalManager.get(body.terminalId);
+		expect(terminal).toBeDefined();
+		const deadline = Date.now() + 2000;
+		while (terminal?.status !== 'exited' && Date.now() < deadline) {
+			await Bun.sleep(10);
+		}
+		const result = {
+			status: response.status,
+			body,
+			output: terminal?.read().join('\n'),
+			exitCode: terminal?.exitCode,
+		};
 
-		expect(response.status).toBe(200);
-		expect(body).toEqual({
+		expect(result.status).toBe(200);
+		expect(result.body).toEqual({
 			command: 'echo plugin-route-ok',
 			terminalId: expect.stringMatching(/^term-/),
 			title: 'Check simulator dependencies',
 			previewUrl: 'http://localhost:3200',
 			execution: 'started',
 		});
+		expect(result.output).toContain('plugin-route-ok');
+		expect(result.exitCode).toBe(0);
 	});
 });
 

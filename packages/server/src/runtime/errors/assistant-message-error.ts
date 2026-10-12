@@ -1,15 +1,16 @@
 import type { getDb } from '@ottocode/database';
 import { messageParts, messages } from '@ottocode/database/schema';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { publish, publishClientEvent } from '../../events/bus.ts';
 import type { RunOpts } from '../session/queue.ts';
-import { hasRunningSubagentDescendant } from '../session/working.ts';
+import { hasScopedRunningSubagentDescendant } from '../agent/runner/runner-working.ts';
 
 export type AssistantMessageErrorInput = {
 	message: string;
 	type: string;
 	details?: unknown;
 	isAborted?: boolean;
+	finishReason?: string;
 };
 
 export async function publishAssistantMessageError(args: {
@@ -18,6 +19,7 @@ export async function publishAssistantMessageError(args: {
 	error: AssistantMessageErrorInput;
 	partId?: string;
 	partIndex?: number;
+	stepIndex?: number;
 	nextPartIndex?: () => number | Promise<number>;
 	publishErrorEvent?: boolean;
 	publishNotification?: boolean;
@@ -32,24 +34,11 @@ export async function publishAssistantMessageError(args: {
 		isAborted,
 	});
 	const now = Date.now();
-	let persisted = true;
-
-	try {
-		await args.db.insert(messageParts).values({
-			id: partId,
-			messageId: args.opts.assistantMessageId,
-			index:
-				args.partIndex ?? (args.nextPartIndex ? await args.nextPartIndex() : 0),
-			stepIndex: null,
-			type: 'error',
-			content,
-			agent: args.opts.agent,
-			provider: args.opts.provider,
-			model: args.opts.model,
-			startedAt: now,
-			completedAt: now,
-		});
-		await args.db
+	const requestedIndex =
+		args.partIndex ??
+		(args.nextPartIndex ? await args.nextPartIndex() : undefined);
+	const persisted = args.db.transaction((tx) => {
+		const claimed = tx
 			.update(messages)
 			.set({
 				status: 'error',
@@ -57,22 +46,57 @@ export async function publishAssistantMessageError(args: {
 				error: args.error.message,
 				errorType: args.error.type,
 				errorDetails: JSON.stringify(args.error.details ?? {}),
-				finishReason: 'error',
+				finishReason: args.error.finishReason ?? 'error',
 				isAborted,
 			})
-			.where(eq(messages.id, args.opts.assistantMessageId));
-	} catch {
-		persisted = false;
-	}
+			.where(
+				and(
+					eq(messages.id, args.opts.assistantMessageId),
+					eq(messages.status, 'pending'),
+				),
+			)
+			.returning({ id: messages.id })
+			.all();
+		if (!claimed.length) return false;
+		const last = tx
+			.select({ index: messageParts.index })
+			.from(messageParts)
+			.where(eq(messageParts.messageId, args.opts.assistantMessageId))
+			.orderBy(desc(messageParts.index))
+			.limit(1)
+			.all();
+		tx.insert(messageParts)
+			.values({
+				id: partId,
+				messageId: args.opts.assistantMessageId,
+				index: Math.max(requestedIndex ?? 0, (last[0]?.index ?? -1) + 1),
+				stepIndex: args.stepIndex ?? null,
+				type: 'error',
+				content,
+				agent: args.opts.agent,
+				provider: args.opts.provider,
+				model: args.opts.model,
+				startedAt: now,
+				completedAt: now,
+			})
+			.run();
+		return true;
+	});
+	if (!persisted) return { partId, content, persisted };
 
 	if (args.publishErrorEvent !== false) {
 		publish({
 			type: 'error',
 			sessionId: args.opts.sessionId,
+			projectId: args.opts.projectId,
+			projectRoot: args.opts.projectRoot,
 			payload: {
 				messageId: args.opts.assistantMessageId,
+				partId,
 				message: args.error.message,
+				error: args.error.message,
 				type: args.error.type,
+				errorType: args.error.type,
 				details: args.error.details,
 				isAborted,
 			},
@@ -82,6 +106,8 @@ export async function publishAssistantMessageError(args: {
 	publish({
 		type: 'message.part.delta',
 		sessionId: args.opts.sessionId,
+		projectId: args.opts.projectId,
+		projectRoot: args.opts.projectRoot,
 		payload: {
 			messageId: args.opts.assistantMessageId,
 			partId,
@@ -93,6 +119,8 @@ export async function publishAssistantMessageError(args: {
 	publish({
 		type: 'message.updated',
 		sessionId: args.opts.sessionId,
+		projectId: args.opts.projectId,
+		projectRoot: args.opts.projectRoot,
 		payload: {
 			id: args.opts.assistantMessageId,
 			status: 'error',
@@ -101,9 +129,10 @@ export async function publishAssistantMessageError(args: {
 	});
 
 	const createdAt = new Date().toISOString();
-	const status = (await hasRunningSubagentDescendant(
+	const status = (await hasScopedRunningSubagentDescendant(
 		args.db,
 		args.opts.sessionId,
+		args.opts.projectRoot,
 	))
 		? 'running'
 		: 'failed';

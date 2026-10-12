@@ -10,6 +10,9 @@ import { buildPwdTool } from './pwd.ts';
 import { buildCdTool } from './cd.ts';
 
 export { rememberFileRead } from './read-tracker.ts';
+// Path and sensitive-input policy, exposed through this package subpath
+// until a dedicated `@ottocode/sdk/tools/policy` export exists.
+export * from '../../policy/index.ts';
 export {
 	executeReadTool,
 	type ReadResult,

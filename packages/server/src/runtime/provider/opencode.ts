@@ -1,16 +1,18 @@
 import type { OttoConfig } from '@ottocode/sdk';
-import { createOpencodeModel } from '@ottocode/sdk';
+import { createProviderModel } from '@ottocode/sdk/providers';
 import { providerFetch } from './fetch.ts';
 
 export function resolveOpencodeModel(
 	model: string,
-	_cfg: OttoConfig,
+	cfg: OttoConfig,
 	sessionId?: string,
+	requestApiKey?: string,
 ) {
-	const apiKey = process.env.OPENCODE_API_KEY;
-	return createOpencodeModel(model, {
+	const apiKey = requestApiKey ?? process.env.OPENCODE_API_KEY;
+	return createProviderModel('opencode', model, {
 		apiKey,
-		promptCacheKey: sessionId,
-		fetch: providerFetch,
+		baseURL: cfg.providers?.opencode?.baseURL,
+		sessionId,
+		customFetch: providerFetch,
 	});
 }

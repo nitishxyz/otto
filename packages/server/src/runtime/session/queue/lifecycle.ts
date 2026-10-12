@@ -28,8 +28,11 @@ function publishRunningStatus(
 /**
  * Gets the current queue state for a session.
  */
-export function getQueueState(sessionId: string): QueueStateSnapshot | null {
-	const state = getRunnerStateInternal(sessionId);
+export function getQueueState(
+	sessionId: string,
+	projectRoot?: string,
+): QueueStateSnapshot | null {
+	const state = getRunnerStateInternal(sessionId, projectRoot);
 	if (!state) return null;
 
 	return {
@@ -42,47 +45,119 @@ export function getQueueState(sessionId: string): QueueStateSnapshot | null {
 	};
 }
 
-export function getRunnerState(sessionId: string): RunnerState | undefined {
-	return getRunnerStateInternal(sessionId);
+export function getRunnerState(
+	sessionId: string,
+	projectRoot?: string,
+): RunnerState | undefined {
+	return getRunnerStateInternal(sessionId, projectRoot);
 }
 
-export function setRunning(sessionId: string, running: boolean): void {
-	const state = getRunnerStateInternal(sessionId);
+export function setRunning(
+	sessionId: string,
+	running: boolean,
+	projectRoot?: string,
+): void {
+	const state = getRunnerStateInternal(sessionId, projectRoot);
 	if (state) state.running = running;
 }
 
 export function setCurrentMessage(
 	sessionId: string,
 	messageId: string | null,
+	projectRoot?: string,
 ): void {
-	const state = getRunnerStateInternal(sessionId);
+	const state = getRunnerStateInternal(sessionId, projectRoot);
 	if (state) {
 		state.currentMessageId = messageId;
-		publishQueueState(sessionId);
+		publishQueueState(sessionId, state.projectRoot);
 		if (messageId) publishRunningStatus(sessionId, messageId, state);
 	}
 }
 
-export function dequeueJob(sessionId: string): RunOpts | undefined {
-	const state = getRunnerStateInternal(sessionId);
-	const job = state?.queue.shift();
-	if (job && state) {
-		state.currentMessageId = job.assistantMessageId;
-		publishQueueState(sessionId);
-		publishRunningStatus(sessionId, job.assistantMessageId, state);
+function startJob(
+	sessionId: string,
+	state: RunnerState,
+	job: RunOpts,
+): RunOpts {
+	if (
+		state.currentMessageId &&
+		state.currentMessageId !== job.assistantMessageId
+	) {
+		deleteMessageAbortController(state.currentMessageId, state.projectRoot);
 	}
+	state.currentMessageId = job.assistantMessageId;
+	publishQueueState(sessionId, state.projectRoot);
+	publishRunningStatus(sessionId, job.assistantMessageId, state);
 	return job;
 }
 
-export function cleanupSession(sessionId: string): void {
-	const state = getRunnerStateInternal(sessionId);
+export function dequeueJob(
+	sessionId: string,
+	projectRoot?: string,
+): RunOpts | undefined {
+	const state = getRunnerStateInternal(sessionId, projectRoot);
+	const job = state?.queue.shift();
+	if (job && state) startJob(sessionId, state, job);
+	return job;
+}
+
+/**
+ * Synchronously claims the runner for a session. Returns false when no queue
+ * state exists or another loop already owns it.
+ */
+export function acquireSessionRunner(
+	sessionId: string,
+	projectRoot?: string,
+): boolean {
+	const state = getRunnerStateInternal(sessionId, projectRoot);
+	if (!state || state.running) return false;
+	state.running = true;
+	return true;
+}
+
+/**
+ * Synchronously takes the next job, or releases the runner and cleans up when
+ * the queue is empty. Dequeue, empty check, and release happen in one
+ * uninterrupted step so an enqueue can never land between them.
+ */
+export function takeNextJobOrRelease(
+	sessionId: string,
+	projectRoot?: string,
+): RunOpts | undefined {
+	const state = getRunnerStateInternal(sessionId, projectRoot);
+	if (!state) return undefined;
+	const job = state.queue.shift();
+	if (job) return startJob(sessionId, state, job);
+	state.running = false;
+	cleanupSession(sessionId, state.projectRoot);
+	return undefined;
+}
+
+/**
+ * Releases the runner after an unexpected loop exit. Returns true when jobs
+ * remain queued so the caller can restart processing.
+ */
+export function releaseSessionRunner(
+	sessionId: string,
+	projectRoot?: string,
+): boolean {
+	const state = getRunnerStateInternal(sessionId, projectRoot);
+	if (!state) return false;
+	state.running = false;
+	if (state.queue.length > 0) return true;
+	cleanupSession(sessionId, state.projectRoot);
+	return false;
+}
+
+export function cleanupSession(sessionId: string, projectRoot?: string): void {
+	const state = getRunnerStateInternal(sessionId, projectRoot);
 	if (state && state.queue.length === 0 && !state.running) {
 		// Clean up any lingering abort controller for current message.
 		if (state.currentMessageId) {
 			deleteMessageAbortController(state.currentMessageId, state.projectRoot);
 		}
 		state.currentMessageId = null;
-		deleteRunnerState(sessionId);
-		publishQueueState(sessionId);
+		deleteRunnerState(sessionId, state.projectRoot, state);
+		publishQueueState(sessionId, state.projectRoot, state);
 	}
 }

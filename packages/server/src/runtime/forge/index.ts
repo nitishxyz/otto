@@ -12,7 +12,10 @@ export { listForgeAuth, runForgeAuthAction } from './auth.ts';
 export { runForgeTunnelAction } from './tunnel.ts';
 export { runForgePluginCommandAction } from './plugin-command.ts';
 export { runForgePluginAction } from './plugin.ts';
-export { runForgePluginToolAction } from './plugin-tool.ts';
+export {
+	resolveForgePluginToolExecutionEffects,
+	runForgePluginToolAction,
+} from './plugin-tool.ts';
 export { runForgePluginCapabilityAction } from './plugin-capability.ts';
 export {
 	FORGE_ACTIONS,

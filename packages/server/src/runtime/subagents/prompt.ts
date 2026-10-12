@@ -1,5 +1,20 @@
-/** Child context size above which the coordinator should compact before reuse. */
+/**
+ * Fallback child context size above which the coordinator should compact
+ * before reuse, used only when the child model's context window is unknown.
+ */
 export const SUBAGENT_COMPACT_THRESHOLD_TOKENS = 300_000;
+
+/** Fraction of the child model's context window that warrants compaction. */
+export const SUBAGENT_COMPACT_THRESHOLD_RATIO = 0.6;
+
+/** Returns the compaction threshold for a child given its context window. */
+export function subagentCompactThreshold(
+	windowTokens: number | null | undefined,
+): number {
+	return typeof windowTokens === 'number' && windowTokens > 0
+		? Math.floor(windowTokens * SUBAGENT_COMPACT_THRESHOLD_RATIO)
+		: SUBAGENT_COMPACT_THRESHOLD_TOKENS;
+}
 
 export function buildSubagentPrompt(args: {
 	parentSessionId: string;
@@ -61,7 +76,10 @@ export function buildSubagentResultsPrompt(
 		task: string;
 		summary: string | null;
 		contextTokens?: number | null;
+		/** Child model context window, when known; makes guidance model-relative. */
+		contextWindowTokens?: number | null;
 	}>,
+	options: { deliveryKey?: string } = {},
 ): string {
 	const sections = finished.map((record) => {
 		const attrs = `id="${record.id}" agent="${record.agent}" status="${record.status}"`;
@@ -78,14 +96,24 @@ export function buildSubagentResultsPrompt(
 		.filter((record) => typeof record.contextTokens === 'number')
 		.map((record) => {
 			const tokens = record.contextTokens as number;
+			const window = record.contextWindowTokens;
+			const threshold = subagentCompactThreshold(window);
+			const hasWindow = typeof window === 'number' && window > 0;
 			const flag =
-				tokens > SUBAGENT_COMPACT_THRESHOLD_TOKENS
-					? ' (over 300k: compact before sending more work)'
+				tokens > threshold
+					? hasWindow
+						? ` (over ${Math.round(SUBAGENT_COMPACT_THRESHOLD_RATIO * 100)}% of window: compact before sending more work)`
+						: ` (over ${Math.round(threshold / 1000)}k: compact before sending more work)`
 					: '';
-			return `- ${record.id} (${record.agent}): ${Math.round(tokens / 1000)}k context tokens${flag}`;
+			const windowLabel = hasWindow
+				? ` of ${Math.round((window as number) / 1000)}k`
+				: '';
+			return `- ${record.id} (${record.agent}): ${Math.round(tokens / 1000)}k${windowLabel} context tokens${flag}`;
 		});
 	return [
-		'<subagent_results>',
+		options.deliveryKey
+			? `<subagent_results delivery="${options.deliveryKey}">`
+			: '<subagent_results>',
 		sections.join('\n\n'),
 		'</subagent_results>',
 		'',

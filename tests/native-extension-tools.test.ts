@@ -246,7 +246,7 @@ describe('native extension tools', () => {
 			echo.execute({ text: 'restarted' }, {} as never),
 		);
 		expect(afterTimeout.result).toMatchObject({ count: 4 });
-		expect((afterTimeout.result as { hostPid: number }).hostPid).not.toBe(
+		expect((afterTimeout.result as { hostPid: number }).hostPid).toBe(
 			result.hostPid,
 		);
 	});

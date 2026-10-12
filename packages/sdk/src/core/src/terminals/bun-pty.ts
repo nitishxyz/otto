@@ -1,3 +1,5 @@
+import { spawnIsolatedPty } from './isolated-pty.ts';
+
 export interface PtyOptions {
 	name?: string;
 	cols?: number;
@@ -25,6 +27,9 @@ export function spawn(
 	args: string[],
 	options: PtyOptions,
 ): IPty {
+	// Native forkpty can deadlock in a multithreaded macOS Bun process.
+	if (process.platform === 'darwin')
+		return spawnIsolatedPty(command, args, options);
 	const dataListeners = new Set<(data: string) => void>();
 	const exitListeners = new Set<(event: IExitEvent) => void>();
 	const decoder = new TextDecoder();
@@ -56,6 +61,7 @@ export function spawn(
 
 	void proc.exited.then((exitCode) => {
 		emitData(decoder.decode());
+		terminal.close();
 		exitEvent = { exitCode };
 		for (const listener of exitListeners) listener(exitEvent);
 	});

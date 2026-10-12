@@ -16,7 +16,25 @@ import {
 import type { AcpSession } from './types';
 import { isConnectionClosedError } from './errors';
 
-export async function handleOttoEvent(
+const pendingUpdates = new WeakMap<AcpSession, Promise<void>>();
+
+export function handleOttoEvent(
+	client: AgentSideConnection,
+	event: OttoEvent,
+	acpSessionId: string,
+	session: AcpSession,
+): Promise<void> {
+	const pending = (pendingUpdates.get(session) ?? Promise.resolve()).then(() =>
+		dispatchOttoEvent(client, event, acpSessionId, session),
+	);
+	pendingUpdates.set(
+		session,
+		pending.catch(() => {}),
+	);
+	return pending;
+}
+
+async function dispatchOttoEvent(
 	client: AgentSideConnection,
 	event: OttoEvent,
 	acpSessionId: string,
@@ -157,7 +175,28 @@ export async function handleOttoEvent(
 					response.outcome?.outcome === 'selected' &&
 					response.outcome.optionId === 'allow';
 
-				resolveApproval(callId, approved);
+				const resolution = resolveApproval(callId, approved, session.cwd);
+				if (!resolution.ok) {
+					await client.sessionUpdate({
+						sessionId: acpSessionId,
+						update: {
+							sessionUpdate: 'tool_call_update',
+							toolCallId: callId,
+							status: 'failed',
+							content: [
+								{
+									type: 'content',
+									content: {
+										type: 'text',
+										text:
+											resolution.error ??
+											'Approval expired or already resolved',
+									},
+								},
+							],
+						},
+					});
+				}
 				return;
 			}
 

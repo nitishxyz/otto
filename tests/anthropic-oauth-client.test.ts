@@ -19,13 +19,20 @@ const EXPIRED_OAUTH: OAuth = {
 	expires: Date.now() - 60_000,
 };
 
-const getAuthMock = mock(async () => EXPIRED_OAUTH);
-const setAuthMock = mock(async () => {});
+let storedOAuth: OAuth = EXPIRED_OAUTH;
+const getAuthMock = mock(async () => storedOAuth);
+const setAuthMock = mock(
+	async (_provider: string, expected: OAuth, updated: OAuth) => {
+		if (storedOAuth !== expected) return false;
+		storedOAuth = updated;
+		return true;
+	},
+);
 
 mock.module('../packages/sdk/src/auth/src/index.ts', () => ({
 	...realAuth,
 	getAuth: getAuthMock,
-	setAuth: setAuthMock,
+	setAuthIfUnchanged: setAuthMock,
 }));
 
 afterAll(() => {
@@ -40,6 +47,7 @@ describe('anthropic oauth client', () => {
 	const originalFetch = globalThis.fetch;
 
 	beforeEach(() => {
+		storedOAuth = EXPIRED_OAUTH;
 		getAuthMock.mockClear();
 		setAuthMock.mockClear();
 	});
@@ -75,6 +83,7 @@ describe('anthropic oauth client', () => {
 		}) as typeof fetch;
 
 		const customFetch = createAnthropicOAuthFetch({
+			authMode: 'managed',
 			oauth: {
 				access: EXPIRED_OAUTH.access,
 				refresh: EXPIRED_OAUTH.refresh,

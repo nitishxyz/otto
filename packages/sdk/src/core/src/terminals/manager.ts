@@ -64,9 +64,11 @@ export class TerminalManager {
 			const terminal = new Terminal(id, pty, options);
 
 			terminal.onExit((_exitCode) => {
+				if (this.terminals.get(id) !== terminal) return;
 				const timer = setTimeout(() => {
 					this.delete(id);
 				}, CLEANUP_DELAY_MS);
+				timer.unref();
 
 				this.cleanupTimers.set(id, timer);
 			});
@@ -94,8 +96,6 @@ export class TerminalManager {
 			throw new Error(`Terminal ${id} not found`);
 		}
 
-		terminal.kill();
-
 		await new Promise<void>((resolve) => {
 			if (terminal.status === 'exited') {
 				resolve();
@@ -103,16 +103,31 @@ export class TerminalManager {
 			}
 
 			const exitHandler = () => {
+				clearTimeout(timer);
+				clearTimeout(escalationTimer);
 				terminal.removeExitListener(exitHandler);
 				resolve();
 			};
 
-			terminal.onExit(exitHandler);
-
-			setTimeout(() => {
+			const timer = setTimeout(() => {
+				terminal.kill('SIGKILL');
+				clearTimeout(escalationTimer);
 				terminal.removeExitListener(exitHandler);
 				resolve();
 			}, 5000);
+			const escalationTimer = setTimeout(() => {
+				if (terminal.status !== 'exited') terminal.kill('SIGKILL');
+			}, 1000);
+
+			terminal.onExit(exitHandler);
+			try {
+				terminal.kill('SIGTERM');
+			} catch (error) {
+				clearTimeout(timer);
+				clearTimeout(escalationTimer);
+				terminal.removeExitListener(exitHandler);
+				throw error;
+			}
 		});
 
 		this.delete(id);

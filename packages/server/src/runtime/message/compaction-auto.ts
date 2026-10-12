@@ -1,6 +1,5 @@
 import type { getDb } from '@ottocode/database';
 import { messageParts } from '@ottocode/database/schema';
-import { eq } from 'drizzle-orm';
 import { streamText } from 'ai';
 import { resolveModel } from '../provider/index.ts';
 import { getAuth } from '@ottocode/sdk';
@@ -8,8 +7,9 @@ import { loadConfig } from '@ottocode/sdk';
 import { getModelLimits } from './compaction-limits.ts';
 import { buildCompactionContext } from './compaction-context.ts';
 import { getCompactionSystemPrompt } from './compaction-detect.ts';
-import { markSessionCompacted } from './compaction-mark.ts';
-import { saveCompactionCheckpoint } from './compaction-checkpoint.ts';
+import { planSessionCompaction } from './compaction-mark.ts';
+import { installCompactionCheckpoint } from './compaction-checkpoint.ts';
+import { validateSummary } from './summary-validation.ts';
 import { detectOAuth, adaptSimpleCall } from '../provider/oauth-adapter.ts';
 import { toErrorMessage } from '../errors/handling.ts';
 
@@ -112,37 +112,33 @@ export async function performAutoCompaction(
 			});
 		}
 
-		if ((await result.finishReason) === 'length') {
-			return {
-				success: false,
-				error: 'Compaction summary exceeded the output limit',
-			};
+		const validation = validateSummary({
+			text: summary,
+			finishReason: await result.finishReason,
+		});
+		if (!validation.ok) {
+			return { success: false, error: validation.reason };
 		}
 
-		await db
-			.update(messageParts)
-			.set({
-				content: JSON.stringify({ text: summary }),
-				completedAt: Date.now(),
-			})
-			.where(eq(messageParts.id, compactPartId));
-
-		if (!summary || summary.length < 50) {
-			return { success: false, error: 'Failed to generate summary' };
-		}
-
-		const compactResult = await markSessionCompacted(
+		// The summary covers evidence through `throughMessageId`; anything
+		// queued after that boundary stays in model history.
+		const summarizedThroughMessageId = throughMessageId ?? assistantMessageId;
+		const plan = await planSessionCompaction(
 			db,
 			sessionId,
-			assistantMessageId,
-			throughMessageId,
+			summarizedThroughMessageId,
 		);
-		void compactResult;
-		await saveCompactionCheckpoint({
+		installCompactionCheckpoint({
 			db,
 			sessionId,
-			compactionMessageId: assistantMessageId,
+			summaryMessageId: assistantMessageId,
+			summarizedThroughMessageId,
 			summary,
+			compactPartIds: plan.partIds,
+			summaryPart: {
+				partId: compactPartId,
+				content: JSON.stringify({ text: summary }),
+			},
 		});
 
 		return { success: true, summary, compactMessageId: assistantMessageId };

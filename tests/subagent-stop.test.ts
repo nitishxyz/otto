@@ -44,7 +44,7 @@ describe('stopSubagent', () => {
 		if (!result.ok) expect(result.error).toContain('No sub-agent');
 	});
 
-	test('marks a running sub-agent cancelled and reported', async () => {
+	test('marks a running sub-agent cancelled with durable pending delivery', async () => {
 		const db = await getDb(projectRoot);
 		const result = await stopSubagent({
 			db,
@@ -67,7 +67,10 @@ describe('stopSubagent', () => {
 			.limit(1);
 		expect(record.status).toBe('cancelled');
 		expect(record.summary).toBe('Stopped by the parent agent.');
-		expect(record.reported).toBe(true);
+		expect(record.reported).toBe(false);
+		expect(record.deliveryState).toBe('pending');
+		expect(record.deliveryKey).toBeNull();
+		expect(record.finishedMessageId).toBeNull();
 	});
 
 	test('rejects stopping an already terminal sub-agent', async () => {

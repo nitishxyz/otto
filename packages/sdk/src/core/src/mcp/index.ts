@@ -68,6 +68,8 @@ export {
 	initializeMCP,
 	ensureMCPManager,
 	reloadMCPManager,
+	reconcileMCPManagers,
+	getMCPManagerGeneration,
 	shutdownMCP,
 	loadMCPConfig,
 	addMCPServerToConfig,

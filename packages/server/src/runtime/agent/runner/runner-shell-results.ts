@@ -3,6 +3,13 @@ import { messageParts } from '@ottocode/database/schema';
 import { logger } from '@ottocode/sdk';
 import type { ModelMessage } from 'ai';
 import {
+	type PrepareStepArgs,
+	type PrepareStepFn,
+	type PrepareStepResult,
+	type ResultPair,
+	withRetainedResultPairs,
+} from '../turn/prepare-step.ts';
+import {
 	publishToolCall,
 	publishToolResult,
 } from '../../../tools/adapter/events.ts';
@@ -15,58 +22,6 @@ import {
 import { buildShellJobResultsPrompt } from '../../shell-jobs/prompt.ts';
 
 const SHELL_RESULT_TOOL_NAME = 'shell_result';
-
-type PrepareStepArgs = {
-	stepNumber: number;
-	steps: unknown[];
-	messages: ModelMessage[];
-};
-
-type PrepareStepResult = Record<string, unknown> & {
-	messages?: ModelMessage[];
-};
-
-type ResultPair = {
-	callId: string;
-	messages: ModelMessage[];
-};
-
-type RetainedResultPair = ResultPair & {
-	insertionIndex: number;
-};
-
-function hasToolCallId(messages: ModelMessage[], callId: string): boolean {
-	return messages.some((message) =>
-		Array.isArray(message.content)
-			? message.content.some(
-					(part) =>
-						typeof part === 'object' &&
-						part !== null &&
-						'toolCallId' in part &&
-						part.toolCallId === callId,
-				)
-			: false,
-	);
-}
-
-function insertRetainedPairs(
-	messages: ModelMessage[],
-	pairs: RetainedResultPair[],
-): ModelMessage[] {
-	const result = [...messages];
-	let offset = 0;
-	for (const pair of pairs) {
-		const insertionIndex = Math.min(
-			pair.insertionIndex + offset,
-			result.length,
-		);
-		if (!hasToolCallId(result, pair.callId)) {
-			result.splice(insertionIndex, 0, ...pair.messages);
-		}
-		offset += pair.messages.length;
-	}
-	return result;
-}
 
 function buildResultMessages(args: {
 	callId: string;
@@ -104,7 +59,15 @@ async function persistFinishedShellResults(args: {
 	ctx: ToolAdapterContext;
 	stepNumber: number;
 }): Promise<ResultPair | undefined> {
-	const jobs = claimFinishedShellJobs(args.ctx.sessionId);
+	const claimed = claimFinishedShellJobs(args.ctx.sessionId);
+	const jobs = claimed.filter(
+		(job) => job.projectRoot === args.ctx.projectRoot,
+	);
+	releaseClaimedShellJobs(
+		claimed
+			.filter((job) => job.projectRoot !== args.ctx.projectRoot)
+			.map((job) => job.id),
+	);
 	if (!jobs.length) return undefined;
 	const jobIds = jobs.map((job) => job.id);
 	const callId = crypto.randomUUID();
@@ -187,50 +150,23 @@ async function persistFinishedShellResults(args: {
 
 /** Injects completed detached shell jobs into the next model step. */
 export function withShellResultsPrepareStep(
-	inner: ((args: PrepareStepArgs) => unknown) | undefined,
+	inner: PrepareStepFn | undefined,
 	context: { db: DB; ctx: ToolAdapterContext },
 ): (args: PrepareStepArgs) => Promise<PrepareStepResult | undefined> {
-	const retainedPairs: RetainedResultPair[] = [];
-	return async (args) => {
-		const innerResult = inner ? await inner(args) : undefined;
-		const base =
-			innerResult && typeof innerResult === 'object'
-				? (innerResult as PrepareStepResult)
-				: {};
-		const messages = base.messages ?? args.messages;
-		try {
-			const persisted = await persistFinishedShellResults({
+	return withRetainedResultPairs(
+		inner,
+		(args) =>
+			persistFinishedShellResults({
 				db: context.db,
 				ctx: context.ctx,
 				stepNumber: args.stepNumber,
-			});
-			if (persisted) {
-				const retainedMessagesInBase = retainedPairs.reduce(
-					(count, pair) =>
-						count +
-						(hasToolCallId(messages, pair.callId) ? pair.messages.length : 0),
-					0,
-				);
-				retainedPairs.push({
-					...persisted,
-					insertionIndex: Math.max(0, messages.length - retainedMessagesInBase),
-				});
-			}
-		} catch (error) {
+			}),
+		(error) => {
 			logger.warn('[shell] failed to inject detached results', {
 				sessionId: context.ctx.sessionId,
 				messageId: context.ctx.messageId,
 				error: error instanceof Error ? error.message : String(error),
 			});
-		}
-		if (!retainedPairs.length) {
-			return innerResult && typeof innerResult === 'object'
-				? (innerResult as PrepareStepResult)
-				: undefined;
-		}
-		return {
-			...base,
-			messages: insertRetainedPairs(messages, retainedPairs),
-		};
-	};
+		},
+	);
 }

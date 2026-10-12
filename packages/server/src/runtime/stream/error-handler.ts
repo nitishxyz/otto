@@ -1,168 +1,123 @@
 import type { getDb } from '@ottocode/database';
 import { messages, messageParts } from '@ottocode/database/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { APICallError } from 'ai';
-import { publish, publishClientEvent } from '../../events/bus.ts';
+import { publish } from '../../events/bus.ts';
 import { isContextOverflowError } from '../errors/context-overflow.ts';
 import { toErrorPayload } from '../errors/handling.ts';
-import { isSendNowPreemptReason, type RunOpts } from '../session/queue.ts';
+import { publishAssistantMessageError } from '../errors/assistant-message-error.ts';
+import type { RunOpts } from '../session/queue.ts';
 import type { ToolAdapterContext } from '../../tools/adapter.ts';
 import { recoverContextOverflow } from '../agent/runner/runner-context-overflow.ts';
-import { hasRunningSubagentDescendant } from '../session/working.ts';
 import { clearPendingTopup } from '../topup/manager.ts';
+import type { RunSessionLoop } from '../agent/turn/types.ts';
+import { findToolResultDurabilityError } from '../agent/turn/durability.ts';
+
+function errorCode(error: unknown): string | undefined {
+	if (!error || typeof error !== 'object') return undefined;
+	const record = error as Record<string, unknown>;
+	if (typeof record.code === 'string') return record.code;
+	for (const nested of [record.error, record.cause, record.data]) {
+		if (!nested || typeof nested !== 'object') continue;
+		const object = nested as Record<string, unknown>;
+		if (typeof object.code === 'string') return object.code;
+		if (object.error && typeof object.error === 'object') {
+			const code = (object.error as Record<string, unknown>).code;
+			if (typeof code === 'string') return code;
+		}
+	}
+	return undefined;
+}
 
 export function createErrorHandler(
 	opts: RunOpts,
 	db: Awaited<ReturnType<typeof getDb>>,
 	getStepIndex: () => number,
 	sharedCtx: ToolAdapterContext,
-	retryCallback: (sessionId: string) => Promise<void>,
+	retryCallback: RunSessionLoop,
 ) {
 	return async (err: unknown) => {
-		if (
-			isSendNowPreemptReason(
-				(opts.abortSignal as (AbortSignal & { reason?: unknown }) | undefined)
-					?.reason,
-			)
-		) {
-			return;
-		}
-
-		const errorPayload = toErrorPayload(err);
-		const isApiError = APICallError.isInstance(err);
 		const stepIndex = getStepIndex();
-
-		const errObj = err as Record<string, unknown>;
-		const nestedError = (errObj?.error as Record<string, unknown>)?.error as
-			| Record<string, unknown>
-			| undefined;
-		const causeError = errObj?.cause as Record<string, unknown> | undefined;
-
-		// Check for OTTOROUTER_FIAT_SELECTED code specifically (not string matching)
-		const errorCode =
-			(errObj?.code as string) ??
-			((errObj?.error as Record<string, unknown>)?.code as string) ??
-			((
-				(errObj?.error as Record<string, unknown>)?.error as Record<
-					string,
-					unknown
-				>
-			)?.code as string) ??
-			((errObj?.data as Record<string, unknown>)?.code as string) ??
-			((errObj?.cause as Record<string, unknown>)?.code as string) ??
-			((
-				(errObj?.cause as Record<string, unknown>)?.error as Record<
-					string,
-					unknown
-				>
-			)?.code as string) ??
-			(nestedError?.code as string) ??
-			(causeError?.code as string) ??
-			'';
-
-		// Also check error message for the exact fiat selection message
-		const _errorMessage =
-			(errObj?.message as string) ??
-			((errObj?.error as Record<string, unknown>)?.message as string) ??
-			((
-				(errObj?.error as Record<string, unknown>)?.error as Record<
-					string,
-					unknown
-				>
-			)?.message as string) ??
-			((errObj?.data as Record<string, unknown>)?.message as string) ??
-			((errObj?.cause as Record<string, unknown>)?.message as string) ??
-			((
-				(errObj?.cause as Record<string, unknown>)?.error as Record<
-					string,
-					unknown
-				>
-			)?.message as string) ??
-			(nestedError?.message as string) ??
-			(causeError?.message as string) ??
-			'';
-
-		const isFiatSelected = errorCode === 'OTTOROUTER_FIAT_SELECTED';
-
-		// Handle fiat payment selected - this is not an error, just a signal to pause
-		if (isFiatSelected) {
-			clearPendingTopup(opts.sessionId);
-
-			// Add a helpful message part telling user to complete payment
+		if (errorCode(err) === 'OTTOROUTER_FIAT_SELECTED') {
 			const partId = crypto.randomUUID();
-			await db.insert(messageParts).values({
-				id: partId,
-				messageId: opts.assistantMessageId,
-				index: await sharedCtx.nextIndex(),
-				stepIndex: getStepIndex(),
-				type: 'error',
-				content: JSON.stringify({
-					message: 'Balance too low — Complete your top-up, then retry.',
-					type: 'balance_low',
-					errorType: 'balance_low',
-					isRetryable: true,
-				}),
-				agent: opts.agent,
-				provider: opts.provider,
-				model: opts.model,
-				startedAt: Date.now(),
-				completedAt: Date.now(),
+			const index = await sharedCtx.nextIndex();
+			const content = JSON.stringify({
+				message: 'Balance too low — Complete your top-up, then retry.',
+				type: 'balance_low',
+				errorType: 'balance_low',
+				isRetryable: true,
 			});
-
-			// Mark the message as completed (not error, not pending)
-			await db
-				.update(messages)
-				.set({
-					status: 'complete',
-					completedAt: Date.now(),
-					error: null,
-					errorType: null,
-					errorDetails: null,
-				})
-				.where(eq(messages.id, opts.assistantMessageId));
-
-			// Emit the message part
+			const now = Date.now();
+			const claimed = db.transaction((tx) => {
+				const updated = tx
+					.update(messages)
+					.set({
+						status: 'complete',
+						completedAt: now,
+						error: null,
+						errorType: null,
+						errorDetails: null,
+					})
+					.where(
+						and(
+							eq(messages.id, opts.assistantMessageId),
+							eq(messages.status, 'pending'),
+						),
+					)
+					.returning({ id: messages.id })
+					.all();
+				if (!updated.length) return false;
+				tx.insert(messageParts)
+					.values({
+						id: partId,
+						messageId: opts.assistantMessageId,
+						index,
+						stepIndex,
+						type: 'error',
+						content,
+						agent: opts.agent,
+						provider: opts.provider,
+						model: opts.model,
+						startedAt: now,
+						completedAt: now,
+					})
+					.run();
+				return true;
+			});
+			if (!claimed) return;
+			clearPendingTopup(opts.sessionId);
 			publish({
 				type: 'message.part.delta',
 				sessionId: opts.sessionId,
+				projectId: opts.projectId,
+				projectRoot: opts.projectRoot,
 				payload: {
 					messageId: opts.assistantMessageId,
 					partId,
 					type: 'error',
-					content: JSON.stringify({
-						message: 'Balance too low — Complete your top-up, then retry.',
-						type: 'balance_low',
-						errorType: 'balance_low',
-						isRetryable: true,
-					}),
+					content,
 				},
 			});
-
-			// Emit message completed
 			publish({
 				type: 'message.completed',
 				sessionId: opts.sessionId,
-				payload: {
-					id: opts.assistantMessageId,
-					fiatTopupRequired: true,
-				},
+				projectId: opts.projectId,
+				projectRoot: opts.projectRoot,
+				payload: { id: opts.assistantMessageId, fiatTopupRequired: true },
 			});
-
-			// Emit a special event so UI knows to show topup modal
 			publish({
 				type: 'ottorouter.fiat.checkout_created',
 				sessionId: opts.sessionId,
-				payload: {
-					messageId: opts.assistantMessageId,
-					needsTopup: true,
-				},
+				projectId: opts.projectId,
+				projectRoot: opts.projectRoot,
+				payload: { messageId: opts.assistantMessageId, needsTopup: true },
 			});
-
 			return;
 		}
 
-		const isPromptTooLong = isContextOverflowError(err);
-
+		const isPromptTooLong =
+			findToolResultDurabilityError(err) === undefined &&
+			isContextOverflowError(err);
 		if (isPromptTooLong && !opts.isCompactCommand) {
 			const recovery = await recoverContextOverflow({
 				db,
@@ -171,90 +126,23 @@ export function createErrorHandler(
 			});
 			if (recovery !== 'failed') return;
 		}
-
-		const errorPartId = crypto.randomUUID();
-		const displayMessage = errorPayload.message;
-		const errorPartType = isPromptTooLong
-			? 'context_length_exceeded'
-			: errorPayload.type;
-		await db.insert(messageParts).values({
-			id: errorPartId,
-			messageId: opts.assistantMessageId,
-			index: await sharedCtx.nextIndex(),
+		const payload = toErrorPayload(err);
+		await publishAssistantMessageError({
+			db,
+			opts,
 			stepIndex,
-			type: 'error',
-			content: JSON.stringify({
-				message: displayMessage,
-				type: errorPartType,
-				errorType: isPromptTooLong ? 'context_length_exceeded' : undefined,
-				details: errorPayload.details,
-				isAborted: false,
-			}),
-			agent: opts.agent,
-			provider: opts.provider,
-			model: opts.model,
-			startedAt: Date.now(),
-			completedAt: Date.now(),
-		});
-
-		await db
-			.update(messages)
-			.set({
-				status: 'error',
-				error: displayMessage,
-				errorType: errorPartType,
-				errorDetails: JSON.stringify({
-					...errorPayload.details,
-					isApiError,
+			nextPartIndex: () => sharedCtx.nextIndex(),
+			error: {
+				message: payload.message,
+				type: isPromptTooLong ? 'context_length_exceeded' : payload.type,
+				details: {
+					...payload.details,
+					isApiError: APICallError.isInstance(err),
 					autoCompacted: false,
-				}),
-				finishReason: 'error',
+				},
 				isAborted: false,
-			})
-			.where(eq(messages.id, opts.assistantMessageId));
-
-		publish({
-			type: 'error',
-			sessionId: opts.sessionId,
-			payload: {
-				messageId: opts.assistantMessageId,
-				partId: errorPartId,
-				error: displayMessage,
-				errorType: errorPartType,
-				details: errorPayload.details,
-				isAborted: false,
-				autoCompacted: false,
 			},
-		});
-
-		const createdAt = new Date().toISOString();
-		const status = (await hasRunningSubagentDescendant(db, opts.sessionId))
-			? 'running'
-			: 'failed';
-		publishClientEvent({
-			type: 'session.status',
-			payload: {
-				sessionId: opts.sessionId,
-				projectId: opts.projectId,
-				projectRoot: opts.projectRoot,
-				status,
-				messageId: opts.assistantMessageId,
-				createdAt,
-			},
-		});
-		publishClientEvent({
-			type: 'notification',
-			payload: {
-				id: crypto.randomUUID(),
-				level: 'error',
-				title: 'Session failed',
-				body: displayMessage,
-				source: 'session',
-				sessionId: opts.sessionId,
-				projectId: opts.projectId,
-				projectRoot: opts.projectRoot,
-				createdAt,
-			},
+			publishNotification: true,
 		});
 	};
 }

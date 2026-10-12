@@ -1,5 +1,5 @@
 import { generateText, streamText } from 'ai';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull, or } from 'drizzle-orm';
 import type { DB } from '@ottocode/database';
 import { messages, messageParts, sessions } from '@ottocode/database/schema';
 import {
@@ -9,9 +9,17 @@ import {
 } from '@ottocode/sdk';
 import { publish } from '../../events/bus.ts';
 import { adaptSimpleCall, detectOAuth } from '../provider/oauth-adapter.ts';
+import {
+	captureQueuedCredentials,
+	getRunProviderAuth,
+	withQueuedCredentials,
+} from '../provider/credentials.ts';
 import { resolveModel } from '../provider/index.ts';
 
 const TITLE_CONCURRENCY_LIMIT = 1;
+/** Upper bound for one title request so a hung provider cannot block the queue. */
+export const TITLE_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_TITLE = 'New Session';
 const titleQueue: Array<() => void> = [];
 let titleActiveCount = 0;
 const titleInFlight = new Set<string>();
@@ -45,18 +53,41 @@ function scheduleSessionTitle(args: {
 	const task = async () => {
 		titleInFlight.add(sessionId);
 		titlePending.delete(sessionId);
+		const controller = new AbortController();
+		let timer: ReturnType<typeof setTimeout> | undefined;
 		try {
-			await generateSessionTitle({ cfg, db, sessionId, content });
+			await Promise.race([
+				generateSessionTitle({
+					cfg,
+					db,
+					sessionId,
+					content,
+					abortSignal: controller.signal,
+				}),
+				new Promise<void>((resolve) => {
+					timer = setTimeout(() => {
+						controller.abort();
+						resolve();
+					}, TITLE_REQUEST_TIMEOUT_MS);
+				}),
+			]);
 		} catch {
 		} finally {
+			if (timer) clearTimeout(timer);
 			titleInFlight.delete(sessionId);
 			titleActiveCount--;
 			processNext();
 		}
 	};
 
+	// Each title runs under the credentials of the request that scheduled it,
+	// not the context of whichever task happens to dequeue it.
+	const job = {};
+	captureQueuedCredentials(job);
 	titlePending.add(sessionId);
-	titleQueue.push(task);
+	titleQueue.push(() => {
+		void withQueuedCredentials(job, task);
+	});
 	processNext();
 }
 
@@ -69,13 +100,18 @@ function enqueueSessionTitle(args: {
 	scheduleSessionTitle(args);
 }
 
-async function generateSessionTitle(args: {
+/**
+ * Generates and stores a session title. The write is conditional: a title set
+ * by the user while generation was running is never overwritten.
+ */
+export async function generateSessionTitle(args: {
 	cfg: OttoConfig;
 	db: DB;
 	sessionId: string;
 	content: unknown;
+	abortSignal?: AbortSignal;
 }): Promise<void> {
-	const { cfg, db, sessionId, content } = args;
+	const { cfg, db, sessionId, content, abortSignal } = args;
 
 	try {
 		const existingSession = await db
@@ -88,15 +124,14 @@ async function generateSessionTitle(args: {
 		}
 
 		const sess = existingSession[0];
-		if (sess.title && sess.title !== 'New Session') {
+		if (sess.title && sess.title !== DEFAULT_TITLE) {
 			return;
 		}
 
 		const provider = (sess.provider ?? cfg.defaults.provider) as ProviderId;
 		const modelName = sess.model ?? cfg.defaults.model;
 
-		const { getAuth } = await import('@ottocode/sdk');
-		const auth = await getAuth(provider, cfg.projectRoot);
+		const auth = await getRunProviderAuth(provider, cfg.projectRoot);
 		const oauth = detectOAuth(provider, auth);
 
 		const titleModel =
@@ -125,6 +160,7 @@ Output ONLY the title, nothing else.`;
 					system: adapted.system,
 					messages: adapted.messages,
 					providerOptions: adapted.providerOptions,
+					abortSignal,
 				});
 				for await (const chunk of result.textStream) {
 					modelTitle += chunk;
@@ -136,25 +172,33 @@ Output ONLY the title, nothing else.`;
 					system: adapted.system,
 					messages: adapted.messages,
 					providerOptions: adapted.providerOptions,
+					abortSignal,
 				});
 				modelTitle = (out?.text || '').trim();
 			}
 		} catch {}
 
-		if (!modelTitle) {
+		if (!modelTitle || abortSignal?.aborted) {
 			return;
 		}
 
 		const sanitized = sanitizeTitle(modelTitle);
 
-		if (!sanitized || sanitized === 'New Session') {
+		if (!sanitized || sanitized === DEFAULT_TITLE) {
 			return;
 		}
 
-		await db
+		const updated = await db
 			.update(sessions)
 			.set({ title: sanitized, lastActiveAt: Date.now() })
-			.where(eq(sessions.id, sessionId));
+			.where(
+				and(
+					eq(sessions.id, sessionId),
+					or(isNull(sessions.title), eq(sessions.title, DEFAULT_TITLE)),
+				),
+			)
+			.returning({ id: sessions.id });
+		if (updated.length === 0) return;
 
 		publish({
 			type: 'session.updated',
@@ -194,7 +238,7 @@ export async function triggerDeferredTitleGeneration(args: {
 			.select()
 			.from(messages)
 			.where(eq(messages.sessionId, sessionId))
-			.orderBy(asc(messages.createdAt))
+			.orderBy(asc(messages.sequence), asc(messages.createdAt))
 			.limit(1);
 
 		if (!userMessages.length || userMessages[0].role !== 'user') {
