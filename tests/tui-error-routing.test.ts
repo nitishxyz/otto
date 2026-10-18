@@ -37,8 +37,9 @@ describe('TUI error routing', () => {
 		for (const file of sourceFiles) {
 			const source = await readFile(join(sourceRoot, file), 'utf8');
 			if (
-				source.includes("from '@opentui/react'") &&
-				source.includes('useTerminalDimensions')
+				/import\s*\{[^}]*\buseTerminalDimensions\b[^}]*\}\s*from\s*['"]@opentui\/react['"]/.test(
+					source,
+				)
 			) {
 				directImports.push(file);
 			}

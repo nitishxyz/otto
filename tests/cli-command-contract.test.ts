@@ -53,7 +53,7 @@ describe('CLI lazy command contracts', () => {
 		).toEqual(['login', 'status', 'list', 'logout']);
 		expect(command(command(program, 'auth'), 'list').aliases()).toEqual(['ls']);
 		expect(command(program, 'mcp').commands.map((item) => item.name())).toEqual(
-			['list', 'status', 'test', 'add', 'remove', 'auth'],
+			['memory', 'list', 'status', 'test', 'add', 'remove', 'auth'],
 		);
 		expect(command(program, 'providers').aliases()).toEqual(['provider']);
 		expect(command(program, 'models').aliases()).toEqual(['switch']);

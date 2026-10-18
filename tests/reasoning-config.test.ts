@@ -152,7 +152,7 @@ describe('buildReasoningConfig', () => {
 	test('uses shared OpenAI-compatible reasoning keys for Kimi', () => {
 		const result = buildReasoningConfig({
 			provider: 'kimi',
-			model: 'kimi-k2.5',
+			model: 'kimi-k2.6',
 			reasoningText: true,
 			reasoningLevel: 'low',
 			maxOutputTokens: 4000,

@@ -21,10 +21,20 @@ bun install
 
 ```bash
 bun lint
-bun test
+bun run test
 bun run typecheck
 bun run compile
 ```
+
+`bun run test` runs all root/package test files in one shared Bun process, then
+desktop tests in a second shared process with `apps/desktop` as cwd. Each group
+has a 180-second deadline and propagates failures. It uses explicit `./` file
+paths: bare Bun arguments such as `tests` are name filters and can accidentally
+discover package-local desktop tests from the wrong directory. Use `bun test
+./tests/<name>.test.ts` for focused checks. On a fresh checkout, generate CLI web
+assets with `bun run scripts/build-web.ts --verbose` before CLI tests/typechecks.
+For a separately bounded file-isolation diagnostic, run `bun run
+scripts/check-test-suite.ts`; this does not replace the default shared run.
 
 ## Useful app/package dev commands
 

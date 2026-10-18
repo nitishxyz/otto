@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, type PersistStorage } from 'zustand/middleware';
 
 interface SidebarState {
 	/** Effective collapsed state for the current viewport. */
@@ -24,7 +24,9 @@ interface PersistedSidebarState {
 	wideCollapsed: boolean;
 }
 
-export function createSidebarStore() {
+export function createSidebarStore(
+	storage?: PersistStorage<PersistedSidebarState>,
+) {
 	return create<SidebarState>()(
 		persist(
 			(set, get) => ({
@@ -60,6 +62,7 @@ export function createSidebarStore() {
 				},
 			}),
 			{
+				...(storage ? { storage } : {}),
 				name: 'sidebar-storage',
 				version: 2,
 				partialize: (state): PersistedSidebarState => ({

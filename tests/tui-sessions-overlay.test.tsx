@@ -1,9 +1,20 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { testRender } from '@opentui/react/test-utils';
 import React, { act } from 'react';
 import { SessionsOverlay } from '../apps/tui/src/components/SessionsOverlay.tsx';
 import { ThemeProvider } from '../apps/tui/src/theme/context.tsx';
+import { TerminalDimensionsProvider } from '../apps/tui/src/terminal-dimensions.tsx';
 import type { Session } from '../apps/tui/src/types.ts';
+
+let originalWindow: PropertyDescriptor | undefined;
+beforeEach(() => {
+	originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+});
+afterEach(() => {
+	if (originalWindow)
+		Object.defineProperty(globalThis, 'window', originalWindow);
+	else Reflect.deleteProperty(globalThis, 'window');
+});
 
 function session(
 	id: string,
@@ -31,21 +42,23 @@ function session(
 describe('TUI sessions overlay', () => {
 	test('marks and selects the current session and spins for working sessions', async () => {
 		const setup = await testRender(
-			React.createElement(
-				ThemeProvider,
-				null,
-				React.createElement(SessionsOverlay, {
-					sessions: [
-						session('session-1', 'First session'),
-						session('session-2', 'Current working session', {
-							isRunning: true,
-						}),
-					],
-					currentSessionId: 'session-2',
-					onSelect: () => {},
-					onClose: () => {},
-				}),
-			),
+			<TerminalDimensionsProvider>
+				{React.createElement(
+					ThemeProvider,
+					null,
+					React.createElement(SessionsOverlay, {
+						sessions: [
+							session('session-1', 'First session'),
+							session('session-2', 'Current working session', {
+								isRunning: true,
+							}),
+						],
+						currentSessionId: 'session-2',
+						onSelect: () => {},
+						onClose: () => {},
+					}),
+				)}
+			</TerminalDimensionsProvider>,
 			{ width: 100, height: 24 },
 		);
 

@@ -2,6 +2,8 @@
 
 > **Status (October 2026):** extraction phases are done; hotspot sizes below are historical. Lifecycle and reliability follow-up is tracked in [harness-reliability-roadmap.md](harness-reliability-roadmap.md).
 
+October 13 acceptance reconciled the retired Kimi reasoning fixture and host-dependent credential fixtures without changing provider policy or public APIs. Cross-file failures were minimized and fixed: concurrent audit clock restoration and OpenTUI window pollution. The default shared-process suite (`bun run test`, with explicit file paths and desktop cwd) and independent split runner both completed all current root/package/desktop test files (414 files; 2,829 pass, 0 fail, 3 skip); lint and workspace typechecks passed after CLI asset generation. This does not imply live credentialed provider smoke or manual desktop acceptance. See the roadmap for current evidence and explicit remaining limits rather than the historical first-step recommendations below.
+
 ## Problem
 
 The core agent runtime works, but several crucial files have accumulated too many responsibilities, compatibility branches, fallback paths, and duplicated helper logic. This makes behavior hard to reason about and makes future provider/tool changes risky.

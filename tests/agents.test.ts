@@ -430,6 +430,8 @@ describe('agent config merging', () => {
 				},
 			}),
 		);
+		const previousApiKey = process.env.ANTHROPIC_API_KEY;
+		process.env.ANTHROPIC_API_KEY = 'test-key';
 		const app = createApp();
 
 		try {
@@ -448,6 +450,8 @@ describe('agent config merging', () => {
 			expect(session.provider).toBe('anthropic');
 			expect(session.model).toBe('claude-sonnet-4-5');
 		} finally {
+			if (previousApiKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+			else process.env.ANTHROPIC_API_KEY = previousApiKey;
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
 	});
@@ -467,6 +471,15 @@ describe('agent config merging', () => {
 			}),
 		);
 		const prevAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
+		const authEnv = [
+			'HOME',
+			'USERPROFILE',
+			'APPDATA',
+			'XDG_STATE_HOME',
+			'XDG_CONFIG_HOME',
+		];
+		const previousAuthEnv = authEnv.map((key) => process.env[key]);
+		for (const key of authEnv) process.env[key] = join(workspaceRoot, 'home');
 		process.env.ANTHROPIC_API_KEY = 'test-key';
 		const app = createApp();
 		let sessionId = '';
@@ -523,6 +536,11 @@ describe('agent config merging', () => {
 			if (prevAnthropicApiKey === undefined)
 				delete process.env.ANTHROPIC_API_KEY;
 			else process.env.ANTHROPIC_API_KEY = prevAnthropicApiKey;
+			for (const [index, key] of authEnv.entries()) {
+				const value = previousAuthEnv[index];
+				if (value === undefined) delete process.env[key];
+				else process.env[key] = value;
+			}
 			await rm(workspaceRoot, { recursive: true, force: true });
 		}
 	});

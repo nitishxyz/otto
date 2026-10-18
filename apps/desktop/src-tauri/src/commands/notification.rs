@@ -274,7 +274,9 @@ fn open_session_window(app: &AppHandle, target: NotificationTarget) {
         context.session_id = Some(session_id);
         let machine = context.machine.clone();
         let project_id = context.workspace.project_id.clone();
-        let _ = super::window::create_window(app, |label| {
+        let mut prepared_label = None;
+        let created = super::window::create_window(app, |label| {
+            prepared_label = Some(label.to_string());
             if let Ok(mut initial) = INITIAL_NOTIFICATIONS
                 .get_or_init(|| Mutex::new(HashMap::new()))
                 .lock()
@@ -294,6 +296,12 @@ fn open_session_window(app: &AppHandle, target: NotificationTarget) {
                 };
             }
         });
+        if let (Err(_), Some(label)) = (created, prepared_label) {
+            forget_notification_window(&label);
+            if let Ok(mut windows) = app.state::<super::machine::MachineWindowState>().0.lock() {
+                windows.remove(&label);
+            }
+        }
     }
 }
 

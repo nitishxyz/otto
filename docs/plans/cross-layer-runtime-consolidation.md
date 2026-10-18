@@ -1,5 +1,7 @@
 # Cross-Layer Runtime Consolidation Plan
 
+> **October 13, 2026 reconciliation:** Phases 1-6 remain implemented; the August verification below is historical. Fresh default shared-process and independent split acceptance completed 414 root/package/desktop files (2,829 pass, 0 fail, 3 skip), lint, workspace typechecks and clean API regeneration. Generate ignored CLI web assets with `bun run scripts/build-web.ts --verbose` before checks on a fresh checkout. `bun run test` uses explicit file paths and desktop cwd, with shared-process coverage and bounded group deadlines; `bun run scripts/check-test-suite.ts` provides separate file-isolation diagnostics. Both include `daemon-service` without touching a live daemon. The diagnosed/fixed cross-file clock/window pollution and remaining native/manual acceptance limits are recorded in [Harness reliability roadmap](harness-reliability-roadmap.md) and [Pause handoff](harness-pause-handoff.md). The process-singleton server runtime is not being replaced in this extraction pass.
+
 ## Purpose
 
 This plan coordinates a full cleanup pass across the Otto SDK, generated API client, server runtime, CLI, and daemon lifecycle. The work follows the same principle used for centralized image preparation: define one clear owner for shared policy, route all callers through it, and keep transport- or process-specific behavior in the correct layer.

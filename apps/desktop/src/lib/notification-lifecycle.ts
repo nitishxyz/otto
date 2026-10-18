@@ -15,6 +15,13 @@ export function createNotificationRegistrationQueue() {
 
 const enqueueRegistration = createNotificationRegistrationQueue();
 
+/** Tracks the newest activation so older in-flight activations yield to it. */
+export function createNotificationActivationSequence() {
+	return { latest: 0 };
+}
+
+const activationSequence = createNotificationActivationSequence();
+
 interface NotificationLifecycleOptions {
 	windowLabel: string;
 	context: NotificationWindowContext;
@@ -30,6 +37,7 @@ interface NotificationLifecycleOptions {
 	navigate: (sessionId: string) => void;
 	onError: (error: unknown) => void;
 	enqueue?: ReturnType<typeof createNotificationRegistrationQueue>;
+	activations?: ReturnType<typeof createNotificationActivationSequence>;
 }
 
 /** Keeps availability publication and cleanup ordered across workspace mounts. */
@@ -40,15 +48,18 @@ export function createNotificationLifecycle(
 	let unlisten: (() => void) | undefined;
 	let published = false;
 	const enqueue = options.enqueue ?? enqueueRegistration;
+	const activations = options.activations ?? activationSequence;
 	const isCurrent = () => !cancelled && options.isCurrent();
 	const activate = async (sessionId: string) => {
+		const token = ++activations.latest;
+		const isActive = () => token === activations.latest && isCurrent();
 		for (const operation of [options.unminimize, options.show, options.focus]) {
-			if (!isCurrent()) return;
+			if (!isActive()) return;
 			await operation().catch(() => {});
 		}
-		if (!isCurrent()) return;
+		if (!isActive()) return;
 		await options.refresh(sessionId);
-		if (!isCurrent()) return;
+		if (!isActive()) return;
 		options.navigate(sessionId);
 	};
 	const ready = options

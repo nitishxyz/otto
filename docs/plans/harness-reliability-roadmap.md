@@ -1,6 +1,6 @@
 # Harness Reliability Roadmap
 
-Status: the four residual goals below are implemented and independently reviewed (2026-10-12), subject to the explicit platform and recovery limits below. No remaining review blockers were identified for these four goals. Other roadmap follow-ups remain; **the full repository suite is not complete or green, and not all original P0 findings are proven closed.**
+Status: the four residual goals below are implemented and independently reviewed (2026-10-12), subject to the explicit platform and recovery limits below. October 13 acceptance completed green bounded default shared-process and independent split runs of 414 files after fixing cross-file pollution and baseline fixtures. **External desktop acceptance and the unavailable original numbered P0 audit still prevent an unconditional completion claim.**
 
 ## Scope and status vocabulary
 
@@ -12,6 +12,44 @@ The October audit identified overlapping ownership of terminal outcomes, tool ca
 - **Blocked**: an unresolved defect or acceptance check prevents closure.
 
 Task boards, unified subagent management, Docker/remote-machine/VM execution, and restart-surviving queued execution are explicitly **future work**. The present attempt identity, project scope, and delivery seams do not implement those products.
+
+## October 13 acceptance reconciliation
+
+The existing implementation was retained, including the uncommitted desktop notification fixes. The continuation is acceptance work, not the proposed Rust/GPUI rewrite. The structural replacement of the process-singleton `createApp()` is explicitly deferred in Phase 4 below; none of the current extraction exit criteria requires changing its public lifetime contract.
+
+- The Kimi reasoning failure used retired `kimi-k2.5`, absent from the current Kimi catalog. The fixture now uses catalog-supported `kimi-k2.6`, retaining the same option-shape assertions. The generated catalog and production reasoning policy were not changed.
+- The agents credential fixture and the judge no-credentials fixture now isolate the secure auth home/state locations and restore environment values in `finally`. Setting only `XDG_CONFIG_HOME` does not isolate secure credentials on macOS. Production credential precedence was not weakened.
+- Additional stale acceptance fixtures were reconciled: MCP command metadata includes `memory`; TUI modal renders mount the dimensions provider; the resize import guard matches the actual imported symbol rather than unrelated same-file references; SSE transport/replay fixtures use canonical session event bytes instead of an unsupported `ready` event or a session event without session identity.
+- CLI checks on a fresh checkout require generated web assets: `bun run scripts/build-web.ts --verbose` succeeded. Missing `apps/cli/src/web-assets.ts` explained eight initial file-load failures, including `daemon-service` and the external memory MCP client. Generated assets remain ignored build outputs.
+- Final default `bun run test` completed **388 repository files: 2,691 pass, 0 fail, 3 skip** (46.29 seconds) and **26 desktop files: 138 pass, 0 fail** (0.135 seconds). Each group runs in one shared process. `scripts/test.ts` supplies explicit `./` file paths and the correct desktop cwd, with a 180-second deadline per group; bare Bun arguments were filters, not directory scoping. Total: **414 files, 2,829 pass, 0 fail, 3 skip**.
+- The independent `bun run scripts/check-test-suite.ts` rerun completed **414 isolated files: 2,829 pass, 0 fail, 3 skip**. Each file has a 60-second process deadline, two workers, individual temporary logs, exit status and a JSON result manifest. No file hit the deadline. This corroborates rather than substitutes for the default shared run.
+- `bun lint` and `bun typecheck` passed after asset generation; the landing workspace retains one existing Astro hint. API regeneration passed without tracked artifact changes.
+- The earlier 300-second timeout (1,567 observed passes, 7 failures, 2 skips) was minimized and fixed. Concurrent prompt-audit snapshots restored global `Date` out of order, leaving time frozen and preventing registry deadlines; audit clock ownership is now serialized and tested. OpenTUI rendering left an incomplete global window, poisoning later web config imports; renderer tests now restore the window descriptor. Web fixtures have failure-safe stream/context cleanup, sidebar storage is injected instead of globally shimmed, and new-session agent coverage supplies/restores its fake credential rather than relying on ambient auth. The seven-file combined reproducer now passes **16 tests**, and the default full shared run is green.
+- Native `cargo test` passed 42 tests and `bun run tauri build --no-bundle` produced the arm64 release binary with patched Homebrew Zig 0.15 and Command Line Tools. Bundle/sign/notarization, app launch and multiwindow GUI acceptance remain external. Focused fixture/daemon combined recheck passed 67 tests; desktop combined recheck passed 138. No live daemon restart was performed.
+
+### Traceability of the recorded critical findings
+
+The original numbered P0 audit is not available in the checked-in plans inspected here (the roadmap was introduced in `cba9e8e5`). The matrix below maps the critical defect categories recorded in this roadmap and the cross-layer audit. It cannot establish one-to-one closure of an unavailable external audit; that provenance gap remains explicit rather than inventing P0 IDs.
+
+| Recorded defect / exit criterion | Current owner | Named regression evidence |
+|---|---|---|
+| Duplicate/late terminal completion; cancellation and continuation races | `runtime/agent/turn/{terminal,finalize,continuation}.ts` | `harness-loop-terminal`, `harness-loop-continuation-attempt`, `harness-loop-execute` |
+| Queue ownership, idle-boundary delivery, cross-project event/approval leakage | `runtime/session/queue/`, scoped event bus and approvals | `harness-loop-queue`, `harness-loop-observer`, `harness-loop-project-scope`, `harness-acp-events`, `harness-acp-connection` |
+| Stored/request credential identity and concurrent OAuth rotation | SDK auth refresh coordinator and provider adapters | `harness-loop-ask-credentials`, `harness-persist-title-credentials`, `harness-anthropic-auth-refresh`, `kimi-oauth-coordination`, `ottorouter-refresh-coordination` |
+| Paths/guards bypass, secret-bearing event persistence, unsafe Forge/plugin execution | `runtime/tools/`, `tools/adapter/`, SDK patch mutation plans | `harness-tools-policy`, `harness-tools-adapter`, `harness-tools-loader-policy`, `harness-patch-path-policy`, `harness-patch-safety`, `harness-orch-forge`, `harness-orch-plugins` |
+| Unacknowledged writer flush, nontransactional message/checkpoint ordering | `runtime/persistence/` and message repository | `harness-persist-writer`, `harness-persist-migration`, `harness-persist-checkpoint`, `harness-compaction-dispatch-boundary` |
+| Invalid compaction/handoff summaries and config/debug round-trip drift | Shared compaction validation, handoff persistence and config schemas | `harness-loop-compaction`, `harness-ctx-reliability`, `handoff`, `config` |
+| Duplicate tool execution/finalization; crash outcome ambiguity | Adapter call identity and file-backed finalization journal/recovery | `harness-tools-adapter`, `harness-tool-finalization-durability` |
+| Subagent stop/follow-up overwrite and lost/repeated parent delivery | `runtime/subagents/transitions.ts`, versioned outbox | `harness-orch-subagents`, `harness-persist-subagent-outbox`, `harness-loop-delivery` |
+| Project initialization races and registry lock replacement | `runtime/projects/{manager,registry-lock}.ts` | `harness-projects-lifecycle`, `harness-projects-registry-lock`, `harness-orch-subagent-project-scope` |
+| Terminal signal success fabrication and native PTY hang | SDK shell engine and macOS isolated PTY helper | `harness-shell-engine`, `harness-shell-lifecycle`, `harness-terminal-helper`, `harness-terminal-cleanup`; upstream Bun remains external |
+| Server/API event mismatch, transport truncation, image corruption | SDK event schemas, API decoder, stream cache/refetch | `harness-events-wire`, `harness-image-streaming-regression`, `shared-protocols`, `sse-client-replay` |
+| Remote web local-daemon side effects and wrong CLI project headers | CLI connection/runtime policy | `cli-web-command`, `cli-project-context`, `otto-server-url-compat` |
+| Daemon restart port race and live version-stale token rotation | CLI daemon process/identity helpers | `daemon-service` (28 tests), `daemon-process`, `daemon-version-mismatch` |
+| Lazy command metadata/validation drift and incompatible API errors/reparsed values | CLI command definitions and Zod-first route/error owners | `cli-command-contract`, `api-errors-validation`, `server-zod-valid-routes` |
+| Invalid public exports, duplicated provider construction, inverted database dependency | SDK public exports/provider factory and injected DB resolver | `sdk-export-contract`, `provider-dispatch`, `provider-baseurl-precedence`, `harness-database-boundary`, `harness-boundary-imports` |
+
+Test names in this matrix refer to `tests/<name>.test.ts`; server owner paths are under `packages/server/src/`. All matrix test files were included in the completed split run. These are named behavioral regressions, not exhaustive crash/platform proofs. Operational recovery limits below remain unchanged.
 
 ## Verification snapshots
 
@@ -35,7 +73,7 @@ The following results were supplied by the coordinating build session on 2026-10
 | Actual in-process plugin-command route with a real terminal | PASS reported by coordinator | Production mitigation evidence, not a native Bun fix or full-suite result; fixture: `tests/harness-terminal-plugin-route.ts`. |
 | Legacy agents credentials / Kimi reasoning failures | Both confirmed on archived HEAD by independent review | Existing baseline failures, not evidence of new continuation regressions; no repository-wide final-green claim. |
 
-The earlier acceptance cleanup was test-only. The legacy workspace-writing fixture now uses a temporary project with `finally` cleanup; the existing `.otto/agents/testagent/agent.md` exact old fixture was left untouched. The broad timeout and remaining baseline fixture failures are unresolved; no broad-suite rerun is implied by the focused acceptance results or successful lint rerun.
+The earlier acceptance cleanup was test-only. The legacy workspace-writing fixture now uses a temporary project with `finally` cleanup; the existing `.otto/agents/testagent/agent.md` exact old fixture was left untouched. These historical broad timeouts and baseline failures are superseded only by the explicitly recorded October 13 split-suite evidence above, not by earlier focused results.
 
 No old daemon restart was performed for the project-registry lock upgrade. Earlier counts remain historical snapshots. The combined review's last finding was swallowed lease-registration failure; project opening now fails closed before runtime allocation. The final narrow recheck above covers that fix, but the full combined run was not repeated afterward. No remaining review blockers were identified for the four requested goals. Restart recovery has a separate file-journal contract below; it is not inferred from in-process retries.
 
@@ -127,15 +165,15 @@ Standalone/explicit-token clients use only the supplied token set and refresh it
 ## Acceptance blockers and follow-ups
 
 1. The four requested continuation goals are implemented and reviewed with no remaining identified review blockers. Keep the upstream native Bun issue, platform/process-group limits, and scoped last lease-fix recheck explicit; do not imply the combined run was repeated after that fix.
-2. Reconcile the two baseline failures (agents credentials and Kimi reasoning), both confirmed on archived HEAD in the 100-file subset review. Earlier formatting/one-shot fixes and successful scoped reviews do not establish a green full repository suite.
-3. Complete a bounded full-suite run, including an explicit strategy for `daemon-service`, and record final counts. The 368-file attempt is incomplete.
-4. Map every original P0 finding to an exit-criterion test/code reference and identify any still-uncovered paths. The 49 harness files alone do not establish exhaustive P0 closure.
+2. Done: the agents credentials and Kimi reasoning baseline fixtures are reconciled without weakening production policy. The secure-home-dependent judge fixture is also isolated.
+3. Done: default shared and independent split acceptance both completed 414 files, 2,829 passes, 0 failures, 3 skips, including `daemon-service`; generated CLI assets are a prerequisite. The seven cross-file failures were diagnosed and fixed, not hidden by isolation.
+4. Recorded critical categories now have the code/test matrix above. The external original numbered P0 audit is unavailable, so exhaustive identity-level closure remains unproven.
 5. Safely restart old daemons before relying on the SQLite registry lock. Old/new lock protocols do not coordinate; never assume the running old daemon already uses the upgrade.
 6. Preserve the reviewed database public initialization contract, canonical SDK provider construction with server policy adapters, and shared shell lifecycle; these are implemented, not remaining extraction tasks.
 7. Preserve reviewed journal crash boundaries, dead/live-owner handling and fail-closed lease registration/inspection. File-backed tool-result recovery is implemented; durable queued execution and automatic mutation replay remain deliberately unsupported.
 8. Keep task boards, remote execution, unified capability indexing, async execution-driver contracts, durable queued-run envelopes, and instance-owned server runtimes in their future design discussions. ACP remote execution remains rejected until supported deliberately.
 
-Exit criteria remain: named regressions for original P0s; lifecycle/adapter/project/ACP/outbox and actual SSE-byte integration coverage; fresh green lint/typecheck/completed relevant test runs; documented platform limitations; preserved public APIs unless a change is explicitly documented. **These criteria are not all satisfied by the current snapshot.**
+Exit criteria remain: named regressions for original P0s; lifecycle/adapter/project/ACP/outbox and actual SSE-byte integration coverage; fresh green lint/typecheck/completed relevant test runs; documented platform limitations; preserved public APIs unless a change is explicitly documented. The default shared and independent split acceptance evidence meets the recorded automated regression criteria; unavailable audit provenance and external/manual checks remain explicit limits.
 
 ## Related plans and boundary rules
 

@@ -591,6 +591,8 @@ function hmac(key: string, value: string): string {
 	return createHmac('sha256', key).update(value).digest('hex');
 }
 
+let frozenTimeQueue: Promise<void> = Promise.resolve();
+
 async function withFrozenTime<T>(
 	iso: string,
 	action: () => Promise<T>,
@@ -598,6 +600,12 @@ async function withFrozenTime<T>(
 	const instant = new Date(iso);
 	if (Number.isNaN(instant.getTime()))
 		throw new Error(`invalid freeze time: ${iso}`);
+	const previous = frozenTimeQueue;
+	let release = () => {};
+	frozenTimeQueue = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	await previous;
 	const RealDate = Date;
 	class FrozenDate extends RealDate {
 		constructor(...args: ConstructorParameters<typeof Date>) {
@@ -612,5 +620,6 @@ async function withFrozenTime<T>(
 		return await action();
 	} finally {
 		globalThis.Date = RealDate;
+		release();
 	}
 }

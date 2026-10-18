@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import {
 	buildClientEventsStreamUrl,
 	buildProjectEventsStreamUrl,
 	buildSessionStreamUrl,
 } from '../packages/api/src/streaming.ts';
+
+const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+afterEach(() => {
+	if (originalWindow)
+		Object.defineProperty(globalThis, 'window', originalWindow);
+	else Reflect.deleteProperty(globalThis, 'window');
+});
 
 function installWindow(runtimeContext?: unknown) {
 	(globalThis as unknown as { window: unknown }).window = {

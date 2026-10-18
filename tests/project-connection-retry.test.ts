@@ -44,17 +44,18 @@ describe('project connection retry', () => {
 			'../packages/web-sdk/src/lib/event-stream.ts'
 		);
 		const stream = acquireClientEventStream();
-		await Bun.sleep(10);
-		setOwnerRenewalHandler(async () => {
-			throw new Error('owner renewal failed');
-		});
-
-		await expect(retryProjectConnection()).rejects.toThrow(
-			'owner renewal failed',
-		);
-		await Bun.sleep(10);
-
-		expect(requests).toBe(2);
-		stream.release();
+		try {
+			await Bun.sleep(10);
+			setOwnerRenewalHandler(async () => {
+				throw new Error('owner renewal failed');
+			});
+			await expect(retryProjectConnection()).rejects.toThrow(
+				'owner renewal failed',
+			);
+			await Bun.sleep(10);
+			expect(requests).toBe(2);
+		} finally {
+			stream.release();
+		}
 	});
 });

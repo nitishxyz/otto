@@ -87,6 +87,7 @@ describe('prompt audit', () => {
 		}
 	});
 	test('provider adapters preserve stable logical ordering and canonical tools', async () => {
+		const originalDate = globalThis.Date;
 		const parent = await mkdtemp(join(tmpdir(), 'agi-prompt-provider-matrix-'));
 		const roots = ['alpha', 'beta', 'gamma'].map((name) => join(parent, name));
 		for (const root of roots) {
@@ -105,6 +106,7 @@ describe('prompt audit', () => {
 					),
 				);
 				const expectedTools = snapshots[0]?.layers.toolSerialization;
+				expect(globalThis.Date).toBe(originalDate);
 				for (const [index, snapshot] of snapshots.entries()) {
 					expect(snapshot.layers.toolSerialization).toBe(expectedTools);
 					const firstProject = snapshot.segments.findIndex(
@@ -131,5 +133,16 @@ describe('prompt audit', () => {
 		} finally {
 			await rm(parent, { recursive: true, force: true });
 		}
+	});
+	test('invalid freeze time rejects without replacing the process clock', async () => {
+		const originalDate = globalThis.Date;
+		await expect(
+			createPromptAudit({
+				...options,
+				projectRoot: process.cwd(),
+				freezeTime: 'invalid',
+			}),
+		).rejects.toThrow('invalid freeze time');
+		expect(globalThis.Date).toBe(originalDate);
 	});
 });

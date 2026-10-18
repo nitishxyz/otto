@@ -19,16 +19,19 @@ describe('SSEClient transport override', () => {
 			throw new Error('browser fetch should not run');
 		}) as typeof fetch;
 		setSSETransport(
-			async () => new Response('event: ready\ndata: {"native":true}\n\n'),
+			async () =>
+				new Response(
+					'event: message.created\ndata: {"id":"m-native","native":true}\n\n',
+				),
 		);
 
 		const client = new SSEClient();
 		let native = false;
-		client.on('ready', (event) => {
+		client.on('message.created', (event) => {
 			native = (event.payload as { native?: boolean }).native === true;
 			client.disconnect();
 		});
-		await client.connect('http://localhost:9100/v1/events/project');
+		await client.connect('http://localhost:9100/v1/sessions/s-native/stream');
 
 		expect(native).toBe(true);
 		expect(browserFetches).toBe(0);
@@ -41,7 +44,7 @@ describe('SSEClient replay cursor', () => {
 		globalThis.fetch = (async (_input, init) => {
 			requestLastEventId = new Headers(init?.headers).get('last-event-id');
 			return new Response(
-				'id: 18\nevent: message.created\ndata: {"payload":{"id":"m-18"}}\n\n',
+				'id: 18\nevent: message.created\ndata: {"id":"m-18"}\n\n',
 				{ headers: { 'content-type': 'text/event-stream' } },
 			);
 		}) as typeof fetch;
@@ -53,7 +56,7 @@ describe('SSEClient replay cursor', () => {
 			receivedId = event.id;
 			client.disconnect();
 		});
-		await client.connect('http://localhost:9100/v1/events/project');
+		await client.connect('http://localhost:9100/v1/sessions/s-18/stream');
 
 		expect(requestLastEventId).toBe('17');
 		expect(receivedId).toBe('18');

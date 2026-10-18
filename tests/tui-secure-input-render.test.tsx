@@ -1,29 +1,42 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { testRender } from '@opentui/react/test-utils';
 import React, { act } from 'react';
 import { SecureInputBar } from '../apps/tui/src/components/SecureInputBar.tsx';
 import { ThemeProvider } from '../apps/tui/src/theme/context.tsx';
+import { TerminalDimensionsProvider } from '../apps/tui/src/terminal-dimensions.tsx';
+
+let originalWindow: PropertyDescriptor | undefined;
+beforeEach(() => {
+	originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+});
+afterEach(() => {
+	if (originalWindow)
+		Object.defineProperty(globalThis, 'window', originalWindow);
+	else Reflect.deleteProperty(globalThis, 'window');
+});
 
 describe('TUI secure-input prompt', () => {
 	test('renders as a centered modal with password masking guidance', async () => {
 		const setup = await testRender(
-			React.createElement(
-				ThemeProvider,
-				null,
-				React.createElement(SecureInputBar, {
-					pendingInput: {
-						promptId: 'prompt-1',
-						messageId: 'message-1',
-						prompt: 'Password for deploy:',
-						inputKind: 'password',
-						allowRemember: true,
-						allowEmpty: false,
-						createdAt: 1,
-					},
-					onSubmit: () => {},
-					onCancel: () => {},
-				}),
-			),
+			<TerminalDimensionsProvider>
+				{React.createElement(
+					ThemeProvider,
+					null,
+					React.createElement(SecureInputBar, {
+						pendingInput: {
+							promptId: 'prompt-1',
+							messageId: 'message-1',
+							prompt: 'Password for deploy:',
+							inputKind: 'password',
+							allowRemember: true,
+							allowEmpty: false,
+							createdAt: 1,
+						},
+						onSubmit: () => {},
+						onCancel: () => {},
+					}),
+				)}
+			</TerminalDimensionsProvider>,
 			{ width: 80, height: 24 },
 		);
 

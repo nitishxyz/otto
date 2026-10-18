@@ -40,14 +40,15 @@ describe('project event stream multiplexer', () => {
 		const firstSession = acquireSessionEventStream('session-first');
 		const secondSession = acquireSessionEventStream('session-second');
 
-		await Bun.sleep(100);
-
-		expect(requests).toEqual([
-			'http://127.0.0.1:4321/v1/events/project?projectId=project-multiplexer-test',
-		]);
-
-		secondSession.release();
-		firstSession.release();
-		client.release();
+		try {
+			await Bun.sleep(100);
+			expect(requests).toEqual([
+				'http://127.0.0.1:4321/v1/events/project?projectId=project-multiplexer-test',
+			]);
+		} finally {
+			secondSession.release();
+			firstSession.release();
+			client.release();
+		}
 	});
 });

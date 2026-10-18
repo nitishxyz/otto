@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+	createNotificationActivationSequence,
 	createNotificationLifecycle,
 	createNotificationRegistrationQueue,
 } from '../src/lib/notification-lifecycle';
@@ -68,6 +69,7 @@ function harness() {
 			errors.push(error);
 		},
 		enqueue: createNotificationRegistrationQueue(),
+		activations: createNotificationActivationSequence(),
 	};
 	return {
 		calls,
@@ -102,6 +104,31 @@ describe('notification activation lifecycle', () => {
 		lifecycle.dispose();
 		await tick();
 		expect(h.errors).toEqual([]);
+	});
+
+	test('newest activation wins when an older refresh finishes later', async () => {
+		const h = harness();
+		const refreshes = new Map<string, ReturnType<typeof deferred<void>>>([
+			['session-a', deferred<void>()],
+			['session-b', deferred<void>()],
+		]);
+		const navigated: string[] = [];
+		const lifecycle = createNotificationLifecycle({
+			...h.options,
+			refresh: (sessionId) => refreshes.get(sessionId)?.promise ?? tick(),
+			navigate: (sessionId) => navigated.push(sessionId),
+		});
+		await lifecycle.ready;
+		const older = lifecycle.activate('session-a');
+		const newer = lifecycle.activate('session-b');
+		await tick();
+		refreshes.get('session-a')?.resolve();
+		await older;
+		refreshes.get('session-b')?.resolve();
+		await newer;
+		expect(navigated).toEqual(['session-b']);
+		lifecycle.dispose();
+		await tick();
 	});
 
 	test('scope change during window operations prevents subsequent focus', async () => {

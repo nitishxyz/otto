@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
 	JudgeClient,
 	createJudgeFromConfig,
@@ -42,10 +45,23 @@ function jsonResponse(body: unknown, status = 200): Response {
 describe('judge config', () => {
 	test('is unavailable without credentials and never throws', async () => {
 		delete process.env.TYPESAFE_API_KEY;
-		const resolved = await resolveJudgeConfig(undefined, '/nonexistent');
-		expect(resolved.enabled).toBe(true);
-		expect(resolved.baseURL).toBe('https://api.typesafe.ai');
-		expect(createJudgeFromConfig(resolved)).toBeNull();
+		const home = await mkdtemp(join(tmpdir(), 'otto-judge-test-'));
+		const authEnv = ['HOME', 'USERPROFILE', 'APPDATA', 'XDG_STATE_HOME'];
+		const previousAuthEnv = authEnv.map((key) => process.env[key]);
+		for (const key of authEnv) process.env[key] = home;
+		try {
+			const resolved = await resolveJudgeConfig(undefined, '/nonexistent');
+			expect(resolved.enabled).toBe(true);
+			expect(resolved.baseURL).toBe('https://api.typesafe.ai');
+			expect(createJudgeFromConfig(resolved)).toBeNull();
+		} finally {
+			for (const [index, key] of authEnv.entries()) {
+				const value = previousAuthEnv[index];
+				if (value === undefined) delete process.env[key];
+				else process.env[key] = value;
+			}
+			await rm(home, { recursive: true, force: true });
+		}
 	});
 
 	test('reads env key and honors overrides', async () => {

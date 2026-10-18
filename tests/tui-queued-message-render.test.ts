@@ -1,10 +1,20 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { testRender } from '@opentui/react/test-utils';
 import React, { act } from 'react';
 import { ChatView } from '../apps/tui/src/components/ChatView.tsx';
 import { MessageItem } from '../apps/tui/src/components/MessageItem.tsx';
 import { ThemeProvider } from '../apps/tui/src/theme/context.tsx';
 import type { Message } from '../apps/tui/src/types.ts';
+
+let originalWindow: PropertyDescriptor | undefined;
+beforeEach(() => {
+	originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+});
+afterEach(() => {
+	if (originalWindow)
+		Object.defineProperty(globalThis, 'window', originalWindow);
+	else Reflect.deleteProperty(globalThis, 'window');
+});
 
 function makeUserMessage(content: string): Message {
 	return {

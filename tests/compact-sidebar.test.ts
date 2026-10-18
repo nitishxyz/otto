@@ -1,5 +1,6 @@
-import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import { createJSONStorage } from 'zustand/middleware';
+import { createSidebarStore } from '../packages/web-sdk/src/stores/sidebarStore';
 
 const values = new Map<string, string>();
 const memoryStorage = {
@@ -12,19 +13,8 @@ const memoryStorage = {
 	removeItem: (key: string) => values.delete(key),
 	setItem: (key: string, value: string) => values.set(key, value),
 };
-const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
-// zustand's persist middleware resolves `window.localStorage` at store
-// creation, so the shim has to exist before the store module is imported.
-Object.defineProperty(globalThis, 'window', {
-	configurable: true,
-	value: { localStorage: memoryStorage },
-});
-
-const { createSidebarStore } = await import(
-	'../packages/web-sdk/src/stores/sidebarStore'
-);
-const useSidebarStore = createSidebarStore();
 const storage = createJSONStorage(() => memoryStorage);
+const useSidebarStore = createSidebarStore(storage);
 
 function resetStore() {
 	values.clear();
@@ -38,14 +28,6 @@ function resetStore() {
 
 describe('compact sidebar behavior', () => {
 	beforeEach(resetStore);
-
-	afterAll(() => {
-		if (originalWindow) {
-			Object.defineProperty(globalThis, 'window', originalWindow);
-		} else {
-			Reflect.deleteProperty(globalThis, 'window');
-		}
-	});
 
 	test('compact viewports start with the sidebar closed', () => {
 		useSidebarStore.getState().setCompactViewport(true);

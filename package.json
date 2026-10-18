@@ -38,7 +38,7 @@
 		"brand:generate": "bun run scripts/generate-brand-assets.ts",
 		"brand:check": "bun run scripts/generate-brand-assets.ts --check",
 		"cli": "bun run apps/cli/index.ts",
-		"test": "bun test tests packages/*/tests --path-ignore-patterns 'tmp/**'",
+		"test": "bun run scripts/test.ts",
 		"db:generate": "drizzle-kit generate --config=drizzle.config.ts",
 		"db:reset": "bun run scripts/reset-db.ts",
 		"daemon:doctor": "bun run scripts/daemon-doctor.ts",

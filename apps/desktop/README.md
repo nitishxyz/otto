@@ -20,6 +20,15 @@ bun run build:desktop
 
 Requires Rust toolchain and Tauri CLI prerequisites. See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
+`libghostty-vt-sys` 0.2.x compiles Ghostty from source with Zig, and the pinned Ghostty commit requires Zig 0.15.x (0.15.2 or newer patch). Zig 0.16+ is rejected. The official Zig 0.15.2 tarball cannot build on macOS SDKs from Xcode/Command Line Tools 26.4 onward, including macOS 27. Those SDK `.tbd` stubs list only `arm64e` targets for `libSystem`, so linking the Zig build runner fails with undefined `_free`, `_getenv`, and similar symbols. The macOS 27 `math.h` also breaks libc++ with an undefined `INFINITY`. Homebrew's keg-only `zig@0.15` carries both upstream fixes, ziglang/zig#31673 and llvm/llvm-project#164348. On macOS, put it first on `PATH` for desktop builds:
+
+```bash
+brew install zig@0.15
+export PATH="$(brew --prefix zig@0.15)/bin:$PATH"
+```
+
+`DOCS_RS=1 cargo check` skips the native Ghostty and Objective-C builds, and Cargo does not rerun those build scripts when the variable is later removed. Use a separate `CARGO_TARGET_DIR` for such checks, or `cargo clean` before a real build.
+
 ## How It Works
 
 The desktop app embeds the compiled ottocode binary and ensures a single shared local daemon is running. Opening a folder reuses that daemon and calls `POST /v1/projects/open`; the returned `projectId` and daemon token are passed to the web UI so API and streaming calls are scoped with `X-Otto-Project-Id`, `X-Otto-Project`, and daemon auth headers.
